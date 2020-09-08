@@ -4,7 +4,7 @@
 
 A Wolfenstein 3D style JavaScript Raycaster using the browser's HTML5 Canvas for rendering.
 
-Heavily modified from [this article by Jacob Seidelin](https://www.libsdl.org/release/SDL2-2.0.10.dmg).
+Heavily modified from [this article by Jacob Seidelin](http://dev.opera.com/articles/view/creating-pseudo-3d-games-with-html-5-can-1/).
 
 Main Differences from original article:
 - **&lt;canvas&gt;** elements are now used for rendering the main scene. In the original article &lt;div&gt; and &lt;img&gt; strips 
