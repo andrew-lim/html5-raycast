@@ -1,0 +1,572 @@
+
+<!--
+JavaScript Canvas Wolfenstein 3D Raycaster
+Author: Andrew Lim
+
+Adapted from this article by Jacob Seidelin
+http://dev.opera.com/articles/view/creating-pseudo-3d-games-with-html-5-can-1/
+
+Main differences from the original:
+- Use <canvas> elements to render the game. In the original article <div> and <img> strips 
+  were used to render the walls, floor and ceiings.
+- Player rotation is now stored as unit circle radians. In other words, moving left
+  is a positive angle.
+- Wall size is now 128 game units. The player's position in a tile is no longer a floating point 
+  value between 0 to 1, but an integer between 0 to 128.
+-->
+<html>
+<head>
+<title>JavaScript Wolfenstein 3D Engine - 2D ray casting</title>
+
+<style>
+body {
+  background-color: rgb(1,65,65);
+  height: 100%; overflow: hidden;
+}
+table {
+  font-family: "Courier New";
+  font-size: 9pt;
+}
+div#minimapcontainer {
+  margin-left: auto;
+  margin-right:auto;
+}
+canvas#minimap {
+ position : absolute;
+}
+canvas#minimapobjects {
+ position : absolute;
+}
+
+#mainCanvas {
+ position : absolute;
+ background-color : none;
+ /* 
+ Do not set canvas dimensions via CSS, use HTML attributes instead
+ https://stackoverflow.com/a/27706093/1645045
+ */
+}
+
+#screen {
+ margin-left: auto;
+ margin-right:auto;
+ width: 640px;
+ height: 400px;
+ border-top : 4px solid rgb(25,25,25);
+ border-left: 4px solid rgb(25,25,25);
+ border-right: 4px solid #1B625E;
+ border-bottom: 4px solid #1B625E;
+ overflow : hidden;
+}
+
+</style>
+
+</head>
+<body>
+  <img id="wallsimg" src="walls.png" alt="Walls" style="display: none">
+  <div id="screen">
+    <canvas id="mainCanvas" width="640" height="400"></canvas>
+  </div>
+  <div id="minimapcontainer">
+    <canvas id="minimap"></canvas>
+    <canvas id="minimapobjects"></canvas>
+  </div>
+
+  <script type="text/javascript">
+    var $ = function(id) { return document.getElementById(id); };
+    var dc = function(tag) { return document.createElement(tag); };
+
+    var map = [
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,3,0,3,0,0,1,1,1,2,1,1,1,1,1,2,1,1,1,2,1,0,0,0,0,0,0,0,0,1],
+      [1,0,0,3,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,1,1,1,1,1],
+      [1,0,0,3,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,3,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2],
+      [1,0,0,3,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,1,1,1,1,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,0,0,0,0,0,0,3,3,3,0,0,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2],
+      [1,0,0,0,0,0,0,0,0,3,3,3,0,0,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,0,0,0,0,0,0,3,3,3,0,0,3,3,3,0,0,0,0,0,0,0,0,0,3,1,1,1,1,1],
+      [1,0,0,0,0,0,0,0,0,3,3,3,0,0,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,4,0,0,4,2,0,2,2,2,2,2,2,2,2,0,2,4,4,0,0,4,0,0,0,0,0,0,0,1],
+      [1,0,0,4,0,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,4,0,0,4,0,0,0,0,0,0,0,1],
+      [1,0,0,4,0,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,4,0,0,4,0,0,0,0,0,0,0,1],
+      [1,0,0,4,0,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,4,0,0,4,0,0,0,0,0,0,0,1],
+      [1,0,0,4,3,3,4,2,2,2,2,2,2,2,2,2,2,2,2,2,4,3,3,4,0,0,0,0,0,0,0,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+    ];
+
+    // Length of a wall or cell in game units.
+    // In the original Wolfenstein 3D it was 8 feet (1 foot = 16 units)
+    const TILE_SIZE = 128;
+
+    // length of wall textures in pixels
+    const TEXTURE_SIZE = 64; 
+
+    var player = {
+      x : 16 * TILE_SIZE, // current x, y position in game units
+      y : 10 * TILE_SIZE,
+      dir : 0,    // the direction that the player is turning, either -1 for left or 1 for right.
+      rot : 0,    // the current angle of rotation. Counterclockwise is positive.
+      speed : 0,    // is the playing moving forward (speed = 1) or backwards (speed = -1).
+      moveSpeed : (TILE_SIZE/4),  // how far (in map units) does the player move each step/update
+      rotSpeed : 4 * Math.PI / 180  // how much does the player rotate each step/update (in radians)
+    }
+
+    const mapWidth = map[0].length;
+    const mapHeight =  map.length;
+    var miniMapScale = 8;
+    var screenWidth = 640;
+    var screenHeight = 400;
+    var stripWidth = 1;
+    var fovDegrees = 60;
+    var fov = fovDegrees * Math.PI / 180; // FOV in radians
+    var numRays = Math.ceil(screenWidth / stripWidth);
+    var fovHalf = fov / 2;
+    var viewDist = (screenWidth/2) / Math.tan((fov / 2));
+    var TWO_PI = Math.PI * 2;
+
+    var g_mainCanvas;
+    var g_mainCanvasContext;
+
+    function init() {
+      bindKeys();
+      initScreen();
+      drawMiniMap();
+      gameCycle();
+    }
+
+    /*
+    https://stackoverflow.com/a/46920541/1645045
+    https://developer.mozilla.org/en-US/docs/Web/API/Window/devicePixelRatio
+    */
+    function sharpenCanvas() {
+      // Set display size (css pixels).
+      var sizew = screenWidth;
+      var sizeh = screenHeight;
+      g_maincanvas.style.width = sizew + "px";
+      g_maincanvas.style.height = sizeh + "px";
+
+      // Set actual size in memory (scaled to account for extra pixel density).
+      var scale = window.devicePixelRatio; // Change to 1 on retina screens to see blurry canvas.
+      g_maincanvas.width = Math.floor(sizew * scale);
+      g_maincanvas.height = Math.floor(sizeh * scale);
+
+      // Normalize coordinate system to use css pixels.
+      g_mainCanvasContext.scale(scale, scale);
+    }
+
+    function initScreen() {
+      g_maincanvas = document.getElementById('mainCanvas');
+      g_mainCanvasContext = g_maincanvas.getContext('2d');
+      var screen = $("screen");
+      screen.style.width = screenWidth + "px";
+      screen.style.height = screenHeight + "px";
+      console.log("screenWidth="+screenWidth+", stripWidth="+stripWidth);
+      console.log("devicePixelRatio="+window.devicePixelRatio);
+      sharpenCanvas();
+    }
+
+    // bind keyboard events to game functions (movement, etc)
+    function bindKeys() {
+      document.onkeydown = function(e) {
+        e = e || window.event;
+        switch (e.keyCode) { // which key was pressed?
+          case 38: // up, move player forward, ie. increase speed
+            player.speed = 1;
+            break;
+          case 40: // down, move player backward, set negative speed
+            player.speed = -1;
+            break;
+          case 37: // left, rotate player left
+            player.dir = -1;
+            break;
+          case 39: // right, rotate player right
+            player.dir = 1;
+            break;
+        }
+      }
+
+      document.onkeyup = function(e) {
+        e = e || window.event;
+        switch (e.keyCode) {
+          case 38:
+          case 40:
+            player.speed = 0; // stop the player movement when up/down key is released
+            break;
+          case 37:
+          case 39:
+            player.dir = 0;
+            break;
+        }
+      }
+    }
+
+    function gameCycle() {
+      move();
+      updateMiniMap();
+      drawFloorAndCeilings();
+      castRays();
+      setTimeout(gameCycle,1000/60);
+    }
+
+
+    function drawFloorAndCeilings() {
+
+      // Ceiling
+      // g_mainCanvasContext.fillStyle = "rgb(56,56,56)";
+      var ceilingGradient = g_mainCanvasContext.createLinearGradient(0, 0, 0, screenHeight/2);
+      ceilingGradient.addColorStop(0, "rgb(0,0,0)");
+      ceilingGradient.addColorStop(1, "rgb(100,100,255)");
+      g_mainCanvasContext.fillStyle = ceilingGradient;
+      g_mainCanvasContext.fillRect(0, 0, screenWidth, screenHeight/2);
+
+      // Floor
+      // g_mainCanvasContext.fillStyle = "rgb(112,112,112)";
+      var floorGradient = g_mainCanvasContext.createLinearGradient(0, screenHeight/2, 0, screenHeight);
+      floorGradient.addColorStop(0, "rgb(100,100,100)");
+      floorGradient.addColorStop(1, "rgb(188,188,188)");
+      
+      // g_mainCanvasContext.fillStyle = "rgb(112,112,112)";
+      g_mainCanvasContext.fillStyle = floorGradient;
+      g_mainCanvasContext.fillRect(0, screenHeight/2, screenWidth, screenHeight/2);
+
+    }
+
+    function castRays() {
+      var stripIdx = 0;
+
+      for (var i=0;i<numRays;i++) {
+        /**
+        Original Ray Angle calculation from  Jacob Seidelin's article.
+
+        // where on the screen does ray go through?
+        var rayScreenPos = (numRays/2 - i) * stripWidth;
+
+        // the distance from the viewer to the point on the screen, simply Pythagoras.
+        var rayViewDist = Math.sqrt(rayScreenPos*rayScreenPos + viewDist*viewDist);
+
+        // the angle of the ray, relative to the viewing direction.
+        // right triangle: a = sin(A) * c
+        var rayAngle = Math.asin(rayScreenPos / rayViewDist);
+        */
+        var leftmostAngle = (fovDegrees/numRays) * -(numRays/2);
+        var rayAngle = leftmostAngle + (fovDegrees/numRays) * i;
+        rayAngle = -rayAngle * Math.PI / 180; // convert to radians
+
+        castSingleRay(
+          player.rot + rayAngle,  // add the players viewing direction to get the angle in world space
+          stripIdx++
+        );
+      }
+    }
+
+    function castSingleRay(rayAngle, stripIdx) {
+      rayAngle %= TWO_PI;
+      if (rayAngle < 0) rayAngle += TWO_PI;
+
+      var right = (rayAngle<TWO_PI*0.25 && rayAngle>=0) || // Quadrant 1
+                  (rayAngle>TWO_PI*0.75); // Quadrant 4
+      var up    = rayAngle<TWO_PI*0.5  && rayAngle>=0; // Quadrant 1 and 2
+
+      var wallType = 0;
+      var textureX; // the x-coord on the texture of the block, ie. what part of the texture are we going to render
+
+      var dist = 0; // the distance to the block we hit
+      var xHit = 0; // the x and y coord of where the ray hit the block
+      var yHit = 0;
+
+      var wallHorizontal = false;
+
+      //--------------------------
+      //
+      // Vertical Lines Checking
+      //
+      //--------------------------
+
+      // Find x coordinate of vertical lines on the right and left
+      var vx = 0;
+      if (right) { 
+        vx = Math.floor(player.x/TILE_SIZE) * TILE_SIZE + TILE_SIZE; 
+      }
+      else {
+        vx = Math.floor(player.x/TILE_SIZE) * TILE_SIZE - 1;
+      }
+
+      // Calculate y coordinate of those lines
+      // lineY = playerY + (playerX-lineX)*tan(ALPHA);
+      var vy = player.y + (player.x-vx)*Math.tan(rayAngle);
+
+      // Calculate stepping vector for each line
+      var stepx = right ? TILE_SIZE : -TILE_SIZE;
+      var stepy = TILE_SIZE * Math.tan(rayAngle);
+
+      // tan() returns positive values in Quadrant 1 and Quadrant 4
+      // But window coordinates need negative coordinates for Y-axis so we reverse them
+      if ( right ) {
+        stepy = -stepy;
+      }
+
+      while (vx >= 0 && vx < mapWidth*TILE_SIZE && vy >= 0 && vy < mapHeight*TILE_SIZE) {
+        var wallY = Math.floor(vy / TILE_SIZE);
+        var wallX = Math.floor(vx / TILE_SIZE);
+        if (map[wallY][wallX] > 0) {
+          var distX = player.x - vx;
+          var distY = player.y - vy;
+          var blockDist = distX*distX + distY*distY;
+          if (!dist || blockDist < dist) {
+            dist = blockDist;
+            xHit = vx;
+            yHit = vy;
+            wallType = map[wallY][wallX];
+            textureX = vy % TILE_SIZE;
+
+            // Facing left, flip image
+            if (!right) {
+              textureX = TILE_SIZE - textureX;
+            }
+          }
+          break;
+        }
+        vx += stepx;
+        vy += stepy;
+      }
+      
+      //--------------------------
+      //
+      // Horizontal Lines Checking
+      //
+      //--------------------------
+
+      // Find y coordinate of horizontal lines on the right and left
+      var hy = 0;
+      if (up) {
+        hy = Math.floor(player.y/TILE_SIZE) * TILE_SIZE - 1;
+      }
+      else {
+        hy = Math.floor(player.y/TILE_SIZE) * TILE_SIZE + TILE_SIZE; 
+      }
+
+      // Calculation x coordinate of horizontal line
+      // lineX = playerX + (playerY-lineY)/tan(ALPHA);
+      var hx = player.x + (player.y-hy) / Math.tan(rayAngle);
+      var stepy = up ? -TILE_SIZE : TILE_SIZE;
+      var stepx = TILE_SIZE / Math.tan(rayAngle);
+
+      // tan() returns stepx as positive in quadrant 3 and negative in quadrant 4
+      // This is the opposite of window coordinates so we need to reverse when angle is facing down
+      if ( !up ) {
+        stepx = -stepx;
+      }
+
+      while (hx >= 0 && hx < mapWidth*TILE_SIZE && hy >= 0 && hy < mapHeight*TILE_SIZE) {
+        var wallY = Math.floor(hy / TILE_SIZE);
+        var wallX = Math.floor(hx / TILE_SIZE);
+        if (map[wallY][wallX] > 0) {
+          var distX = player.x - hx;
+          var distY = player.y - hy;
+          var blockDist = distX*distX + distY*distY;
+          if (!dist || blockDist < dist) {
+            dist = blockDist;
+            xHit = hx;
+            yHit = hy;
+            wallType = map[wallY][wallX];
+            textureX = hx % TILE_SIZE;
+            wallHorizontal = true;
+
+            // Facing down, flip image
+            if (!up) {
+              textureX = TILE_SIZE - textureX;
+            }
+          }
+          break;
+        }
+        hx += stepx;
+        hy += stepy;
+      }
+
+
+      if (dist) {
+        drawRay(xHit, yHit);
+        dist = Math.sqrt(dist);
+
+        // use perpendicular distance to adjust for fish eye
+        // distorted_dist = correct_dist / cos(relative_angle_of_ray)
+        dist = dist * Math.cos( player.rot - rayAngle );
+
+        // "real" wall height in the game world is 1 unit, the distance from the player to the screen is viewDist,
+        // thus the height on the screen is equal to wall_height_real * viewDist / dist
+        var wallScreenHeight = Math.round(viewDist / dist*TILE_SIZE);
+
+        var g_mainCanvas = document.getElementById("mainCanvas");
+        var g_mainCanvasContext = g_mainCanvas.getContext("2d");
+        var wallsimg = document.getElementById("wallsimg");
+
+        var sx = (wallHorizontal?TEXTURE_SIZE-1:0) + (textureX/TILE_SIZE*TEXTURE_SIZE);
+        var sy = TEXTURE_SIZE * (wallType-1);
+        var swidth = 1;
+        var sheight = TEXTURE_SIZE;
+        var imgx = stripIdx * stripWidth;
+        var imgy = (screenHeight - wallScreenHeight)/2;
+        var imgw = stripWidth;
+        var imgh = wallScreenHeight;
+        g_mainCanvasContext.imageSmoothingEnabled = false;
+        g_mainCanvasContext.drawImage(wallsimg,sx,sy,swidth,sheight,imgx,imgy,imgw,imgh);
+      }
+
+    }
+
+    function drawRay(rayX, rayY) {
+      var miniMapObjects = $("minimapobjects");
+      var objectCtx = miniMapObjects.getContext("2d");
+
+      rayX = rayX / (mapWidth*TILE_SIZE) * 100;
+      rayX = rayX/100 * miniMapScale * mapWidth;
+      rayY = rayY / (mapHeight*TILE_SIZE) * 100;
+      rayY = rayY/100 * miniMapScale * mapHeight;
+
+      var playerX = player.x / (mapWidth*TILE_SIZE) * 100;
+      playerX = playerX/100 * miniMapScale * mapWidth;
+
+      var playerY = player.y / (mapHeight*TILE_SIZE) * 100;
+      playerY = playerY/100 * miniMapScale * mapHeight;
+
+      objectCtx.strokeStyle = "rgba(0,100,0,0.3)";
+      objectCtx.lineWidth = 0.5;
+      objectCtx.beginPath();
+      objectCtx.moveTo(playerX, playerY);
+      objectCtx.lineTo(
+        rayX,
+        rayY
+      );
+      objectCtx.closePath();
+      objectCtx.stroke();
+    }
+
+    function move() {
+      // speed = forward / backward = 1 or -1
+      var moveStep = player.speed * player.moveSpeed; // player will move this far along the current direction vector
+
+      // dir = left / right = -1 or 1
+      player.rot += -player.dir * player.rotSpeed; // add rotation if player is rotating (player.dir != 0)
+
+      // make sure the angle is between 0 and 360 degrees
+      // while (player.rot < 0) player.rot += TWO_PI;
+      // while (player.rot >= TWO_PI) player.rot -= TWO_PI;
+
+       // cos(angle) = A / H = x / H
+       // x = H * cos(angle)
+       // sin(angle) = O / H = y / H
+       // y = H * sin(angle)
+      var newX = player.x + Math.cos(player.rot) * moveStep;  // calculate new player position with simple trigonometry
+      var newY = player.y + -Math.sin(player.rot) * moveStep;
+
+      // Round down to integers
+      newX = Math.floor( newX );
+      newY = Math.floor( newY );
+
+      var wallX = newX / TILE_SIZE;
+      var wallY = newY / TILE_SIZE;
+
+      if (isBlocking(wallX, wallY)) { // are we allowed to move to the new position?
+        return; // no, bail out.
+      }
+
+      player.x = newX; // set new position
+      player.y = newY;
+    }
+
+    function isBlocking(x,y) {
+
+      // first make sure that we cannot move outside the boundaries of the level
+      if (y < 0 || y >= mapHeight || x < 0 || x >= mapWidth)
+        return true;
+
+      // return true if the map block is not 0, ie. if there is a blocking wall.
+      return (map[Math.floor(y)][Math.floor(x)] != 0); 
+    }
+
+    function updateMiniMap() {
+
+      var miniMap = $("minimap");
+      var miniMapObjects = $("minimapobjects");
+
+      var objectCtx = miniMapObjects.getContext("2d");
+      
+      miniMapObjects.width = miniMapObjects.width;
+
+      var playerX = player.x / (mapWidth*TILE_SIZE) * 100;
+      playerX = playerX/100 * miniMapScale * mapWidth;
+
+      var playerY = player.y / (mapHeight*TILE_SIZE) * 100;
+      playerY = playerY/100 * miniMapScale * mapHeight;
+
+      objectCtx.fillStyle = "red";
+      objectCtx.fillRect(   // draw a dot at the current player position
+        playerX  - 2, 
+        playerY  - 2,
+        4, 4
+      );
+
+      objectCtx.strokeStyle = "red";
+      objectCtx.beginPath();
+      objectCtx.moveTo(playerX , playerY );
+      objectCtx.lineTo(
+        (playerX +  Math.cos(player.rot) * 4 * miniMapScale) ,
+        (playerY + -Math.sin(player.rot) * 4 * miniMapScale) 
+      );
+      objectCtx.closePath();
+      objectCtx.stroke();
+    }
+
+    function drawMiniMap() {
+
+      // draw the topdown view minimap
+
+      var miniMap = $("minimap");     // the actual map
+      var miniMapCtr = $("minimapcontainer");   // the container div element
+      var miniMapObjects = $("minimapobjects"); // the canvas used for drawing the objects on the map (player character, etc)
+
+      miniMap.width = mapWidth * miniMapScale;  // resize the internal canvas dimensions 
+      miniMap.height = mapHeight * miniMapScale;  // of both the map canvas and the object canvas
+      miniMapObjects.width = miniMap.width;
+      miniMapObjects.height = miniMap.height;
+
+      var w = (mapWidth * miniMapScale) + "px"  // minimap CSS dimensions
+      var h = (mapHeight * miniMapScale) + "px"
+      miniMap.style.width = miniMapObjects.style.width = miniMapCtr.style.width = w;
+      miniMap.style.height = miniMapObjects.style.height = miniMapCtr.style.height = h;
+
+
+      var ctx = miniMap.getContext("2d");
+
+      ctx.fillStyle = "white";
+      ctx.fillRect(0,0,miniMap.width,miniMap.height);
+
+      // loop through all blocks on the map
+      for (var y=0;y<mapHeight;y++) {
+        for (var x=0;x<mapWidth;x++) {
+          var wall = map[y][x];
+          if (wall > 0) { // if there is a wall block at this (x,y) ...
+            ctx.fillStyle = "rgb(200,200,200)";
+            ctx.fillRect(       // ... then draw a block on the minimap
+              x * miniMapScale,
+              y * miniMapScale,
+              miniMapScale,miniMapScale
+            );
+          }
+        }
+      }
+
+      updateMiniMap();
+    }
+    setTimeout(init, 1);
+  </script>
+</body>
