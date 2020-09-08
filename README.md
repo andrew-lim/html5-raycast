@@ -4,6 +4,8 @@
 
 A Wolfenstein 3D style JavaScript Raycaster using the browser's HTML5 Canvas for rendering.
 
+[View Demo Here](https://andrew-lim.github.io/html5-raycast/raycast3d.htm)
+
 Heavily modified from [this article by Jacob Seidelin](http://dev.opera.com/articles/view/creating-pseudo-3d-games-with-html-5-can-1/).
 
 Main Differences from original article:
