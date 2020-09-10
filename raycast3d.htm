@@ -129,7 +129,6 @@ canvas#minimapobjects {
     var fovDegrees = 60;
     var fov = fovDegrees * Math.PI / 180; // FOV in radians
     var numRays = Math.ceil(screenWidth / stripWidth);
-    var fovHalf = fov / 2;
     var viewDist = (screenWidth/2) / Math.tan((fov / 2));
     var TWO_PI = Math.PI * 2;
 
@@ -244,8 +243,8 @@ canvas#minimapobjects {
       var stripIdx = 0;
 
       for (var i=0;i<numRays;i++) {
-        /**
-        Original Ray Angle calculation from  Jacob Seidelin's article.
+
+        // Original Ray Angle calculation from  Jacob Seidelin's article.
 
         // where on the screen does ray go through?
         var rayScreenPos = (numRays/2 - i) * stripWidth;
@@ -256,10 +255,11 @@ canvas#minimapobjects {
         // the angle of the ray, relative to the viewing direction.
         // right triangle: a = sin(A) * c
         var rayAngle = Math.asin(rayScreenPos / rayViewDist);
-        */
-        var leftmostAngle = (fovDegrees/numRays) * -(numRays/2);
-        var rayAngle = leftmostAngle + (fovDegrees/numRays) * i;
-        rayAngle = -rayAngle * Math.PI / 180; // convert to radians
+
+        // TODO: find out why this causes fisheye effect sometimes.
+        // var leftmostAngle = (fovDegrees/numRays) * -(numRays/2);
+        // var rayAngle = leftmostAngle + (fovDegrees/numRays) * i;
+        // rayAngle = -rayAngle * Math.PI / 180; // convert to radians
 
         castSingleRay(
           player.rot + rayAngle,  // add the players viewing direction to get the angle in world space
