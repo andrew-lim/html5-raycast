@@ -7,11 +7,11 @@ Adapted from this article by Jacob Seidelin
 http://dev.opera.com/articles/view/creating-pseudo-3d-games-with-html-5-can-1/
 
 Main differences from the original:
-- Use <canvas> elements to render the game. In the original article <div> and <img> strips 
+- Use <canvas> elements to render the game. In the original article <div> and <img> strips
   were used to render the walls, floor and ceiings.
 - Player rotation is now stored as unit circle radians. In other words, moving left
   is a positive angle.
-- Wall size is now 128 game units. The player's position in a tile is no longer a floating point 
+- Wall size is now 128 game units. The player's position in a tile is no longer a floating point
   value between 0 to 1, but an integer between 0 to 128.
 -->
 <html>
@@ -41,7 +41,7 @@ canvas#minimapobjects {
 #mainCanvas {
  position : absolute;
  background-color : none;
- /* 
+ /*
  Do not set canvas dimensions via CSS, use HTML attributes instead
  https://stackoverflow.com/a/27706093/1645045
  */
@@ -104,11 +104,10 @@ canvas#minimapobjects {
     ];
 
     // Length of a wall or cell in game units.
-    // In the original Wolfenstein 3D it was 8 feet (1 foot = 16 units)
     const TILE_SIZE = 128;
 
     // length of wall textures in pixels
-    const TEXTURE_SIZE = 64; 
+    const TEXTURE_SIZE = 64;
 
     var player = {
       x : 16 * TILE_SIZE, // current x, y position in game units
@@ -232,7 +231,7 @@ canvas#minimapobjects {
       var floorGradient = g_mainCanvasContext.createLinearGradient(0, screenHeight/2, 0, screenHeight);
       floorGradient.addColorStop(0, "rgb(100,100,100)");
       floorGradient.addColorStop(1, "rgb(188,188,188)");
-      
+
       // g_mainCanvasContext.fillStyle = "rgb(112,112,112)";
       g_mainCanvasContext.fillStyle = floorGradient;
       g_mainCanvasContext.fillRect(0, screenHeight/2, screenWidth, screenHeight/2);
@@ -245,18 +244,27 @@ canvas#minimapobjects {
       for (var i=0;i<numRays;i++) {
 
         // Original Ray Angle calculation from  Jacob Seidelin's article.
+        // Changed to use atan instead of asin
 
-        // where on the screen does ray go through?
-        var rayScreenPos = (numRays/2 - i) * stripWidth;
+        /*
+              screenX
+                    <------
+                    +-----+------+  +-
+                    \     |     /   |
+                     \    |    /    |
+        rayViewDist   \   |   /     | viewDist aka projectionPlaneDistance
+                       \  |  /      |
+                        \a| /       |
+                         \|/        |
+                          v         |_
 
-        // the distance from the viewer to the point on the screen, simply Pythagoras.
-        var rayViewDist = Math.sqrt(rayScreenPos*rayScreenPos + viewDist*viewDist);
+        a = atan( screenX / viewDist )
+        */
+        var screenX = (numRays/2 - i) * stripWidth;
+        var rayAngle = Math.atan(screenX / viewDist);
 
-        // the angle of the ray, relative to the viewing direction.
-        // right triangle: a = sin(A) * c
-        var rayAngle = Math.asin(rayScreenPos / rayViewDist);
-
-        // TODO: find out why this causes fisheye effect sometimes.
+        // Alternative code below causes fisheye effect near edges
+        // https://stackoverflow.com/questions/24173966/raycasting-engine-rendering-creating-slight-distortion-increasing-towards-edges
         // var leftmostAngle = (fovDegrees/numRays) * -(numRays/2);
         // var rayAngle = leftmostAngle + (fovDegrees/numRays) * i;
         // rayAngle = -rayAngle * Math.PI / 180; // convert to radians
@@ -293,8 +301,8 @@ canvas#minimapobjects {
 
       // Find x coordinate of vertical lines on the right and left
       var vx = 0;
-      if (right) { 
-        vx = Math.floor(player.x/TILE_SIZE) * TILE_SIZE + TILE_SIZE; 
+      if (right) {
+        vx = Math.floor(player.x/TILE_SIZE) * TILE_SIZE + TILE_SIZE;
       }
       else {
         vx = Math.floor(player.x/TILE_SIZE) * TILE_SIZE - 1;
@@ -338,7 +346,7 @@ canvas#minimapobjects {
         vx += stepx;
         vy += stepy;
       }
-      
+
       //--------------------------
       //
       // Horizontal Lines Checking
@@ -351,7 +359,7 @@ canvas#minimapobjects {
         hy = Math.floor(player.y/TILE_SIZE) * TILE_SIZE - 1;
       }
       else {
-        hy = Math.floor(player.y/TILE_SIZE) * TILE_SIZE + TILE_SIZE; 
+        hy = Math.floor(player.y/TILE_SIZE) * TILE_SIZE + TILE_SIZE;
       }
 
       // Calculation x coordinate of horizontal line
@@ -490,7 +498,7 @@ canvas#minimapobjects {
         return true;
 
       // return true if the map block is not 0, ie. if there is a blocking wall.
-      return (map[Math.floor(y)][Math.floor(x)] != 0); 
+      return (map[Math.floor(y)][Math.floor(x)] != 0);
     }
 
     function updateMiniMap() {
@@ -499,7 +507,7 @@ canvas#minimapobjects {
       var miniMapObjects = $("minimapobjects");
 
       var objectCtx = miniMapObjects.getContext("2d");
-      
+
       miniMapObjects.width = miniMapObjects.width;
 
       var playerX = player.x / (mapWidth*TILE_SIZE) * 100;
@@ -510,7 +518,7 @@ canvas#minimapobjects {
 
       objectCtx.fillStyle = "red";
       objectCtx.fillRect(   // draw a dot at the current player position
-        playerX  - 2, 
+        playerX  - 2,
         playerY  - 2,
         4, 4
       );
@@ -520,7 +528,7 @@ canvas#minimapobjects {
       objectCtx.moveTo(playerX , playerY );
       objectCtx.lineTo(
         (playerX +  Math.cos(player.rot) * 4 * miniMapScale) ,
-        (playerY + -Math.sin(player.rot) * 4 * miniMapScale) 
+        (playerY + -Math.sin(player.rot) * 4 * miniMapScale)
       );
       objectCtx.closePath();
       objectCtx.stroke();
@@ -534,7 +542,7 @@ canvas#minimapobjects {
       var miniMapCtr = $("minimapcontainer");   // the container div element
       var miniMapObjects = $("minimapobjects"); // the canvas used for drawing the objects on the map (player character, etc)
 
-      miniMap.width = mapWidth * miniMapScale;  // resize the internal canvas dimensions 
+      miniMap.width = mapWidth * miniMapScale;  // resize the internal canvas dimensions
       miniMap.height = mapHeight * miniMapScale;  // of both the map canvas and the object canvas
       miniMapObjects.width = miniMap.width;
       miniMapObjects.height = miniMap.height;
