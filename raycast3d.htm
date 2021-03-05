@@ -1,4 +1,3 @@
-
 <!--
 JavaScript Canvas Wolfenstein 3D Raycaster
 Author: Andrew Lim
@@ -9,27 +8,27 @@ http://dev.opera.com/articles/view/creating-pseudo-3d-games-with-html-5-can-1/
 Main differences from the original:
 - Use <canvas> elements to render the game. In the original article <div> and <img> strips
   were used to render the walls, floor and ceiings.
-- Player rotation is now stored as unit circle radians. In other words, moving left
+- Player rotation is now stored as unit circle radians. In other words, turning left counterclockwise
   is a positive angle.
 - Wall size is now 128 game units. The player's position in a tile is no longer a floating point
   value between 0 to 1, but an integer between 0 to 128.
 -->
 <html>
 <head>
-<title>JavaScript Wolfenstein 3D Engine - 2D ray casting</title>
+<title>JavaScript Raycasting Engine</title>
 
 <style>
 body {
-  background-color: rgb(1,65,65);
+  background-color: rgb(25,65,65);
   height: 100%; overflow: hidden;
+  color: white;
 }
 table {
   font-family: "Courier New";
-  font-size: 9pt;
+  font-size: 12pt;
 }
 div#minimapcontainer {
-  margin-left: auto;
-  margin-right:auto;
+
 }
 canvas#minimap {
  position : absolute;
@@ -50,8 +49,8 @@ canvas#minimapobjects {
 #screen {
  margin-left: auto;
  margin-right:auto;
- width: 640px;
- height: 400px;
+ /*width: 480px;
+ height: 320px;*/
  border-top : 4px solid rgb(25,25,25);
  border-left: 4px solid rgb(25,25,25);
  border-right: 4px solid #1B625E;
@@ -64,17 +63,82 @@ canvas#minimapobjects {
 </head>
 <body>
   <img id="wallsimg" src="walls.png" alt="Walls" style="display: none">
+  <!------------------------------------------------------------------------
+  Base64 encoded images for floor and ceiling.
+  This is to prevent "canvas has been tainted by cross-origin data" errors.
+  ------------------------------------------------- ----------------------->
+  <img id="floorimg"
+       src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAS4SURBVHhe7Zo9TiNLFIVtxwSEBCyBkCUQEBKwBBZIQMgSCFgEASEB+Rt9Fp/n9HWVxcyzy4zcRyrdun/nlMvddnerl7e3t/+dnZ0tPj8/F3d3d4vz8/MFPoP5vvHx8bHWYjB/fHxcax1Lf7IB19fXi5ubm6/S74G+hFzfsS8vL4vn5+dN7Bj6q6++LVCUwDfmvNYAYj3Rmt+FmsdPjvQTxP5Ef2sDSGSRhfhAX1tRRVNMvL+/f822QW322Xso/eYRUJsqQRUQ2deqSd+6Fmq+1iaH3CD7WjXpW9c9BU4FzQ3IXRPuWO7gxcXFpLYe2uQc1JDP3e8hOYU95rD70N/5I9hahARJqLUmLWDu4oxX7go1Esa0+9DfuQF1GK+LAFqQNXxLgpjC8vVAvg7j+9Tf2gASb29v60JshRcSChgDkmevC6sXID2M1u/+BkDAlRjFkjE3JlHGrLNXWEM863sYqb+1AZIogHVHJZGAXM6B/YplX35rPdg/Sn9rAyjSKq4vCZbc5eXlWsS89dWmuD7zFshrrdc/hP7kXgDC0cjFHUN/vQFM8jAaCT58PYxHAe3NBpwqlvf396e9Aa+vr9/eAA9TBvNjP8zYh/7y6elpswGSfcf+hIcZf6tPvZj8DfbEbKh+DzWPnxzpJ4gdUt+RmGzALnGR19wVCthnLz7Q11aM0k+sMmmBVrG6kBZRDy1eoO5IfZC6jBUiuYi0gLkLMW59D9TVGmNadUfrpy5jfQSQ5LbRJqzDuLeVzF1IC+RB1sjVgnyj9Y1tTgF3WUDgoMad2yUOrE/YYw7LB8raUfqpy5hPAZIKAAuxHnaAmKQupAfydRiX20WA0fqpt+KKCkiO5Q4NWFivwHog792dHAl5yGONgRH6VZex8k7MBmxeRpLDJ+4c24OLqLzZ6wfJ2Aj9qstYHwHuSi7CZsVz93qwXyGs34Y8LoxczoH92EPoV13G+jdA8pZNcX3mLZDXWq8vj/3HeJpELHXB8uHh4a9vh3Nx/+rTpOXV1dVpPw+Ynwgd+YmQ52qesyMxeSo8vyIzvyLzGxQl8I05rzWAWE+05neh5vGTI/0EsT/R39oAEllkIT7Q11ZU0RQTeS1eQW322Xso/eYRUJsqQRUQ2deqSd+6Fmq+1iaH3CD7WjXpW9fcgGwSNiTBse7p96m/8zegtQgJklBrTVrA3MUZr9wVaiSMafehv3MD6jBeFwG0IGt++jOF5o+g19jYCv9HFTAGJM9eF1b/f3sYrd/9DYDA20bJmBuTKGPW2SusIZ71PYzU39oASRTAuqOSSEAu58B+xbIvv7Ue7B+lv7UBFGkV15cES+4Y9/TZvw/9yaXwv3pP/38w2YA8lEYAXeBhDEbrz88D5jdE5jdE5jdENuiJ2VD9HmoePznSTxA7pL4jMdmAXeIir7krFLDPXnygr60YpZ/YbECKJYnN6beIRM3X2uSQG2RfqyZ961qo+ZxXTjC/HyCxBWkBcxdnvApUKJAwplV3tH7qMtangALAQuxPv5fvgXwdxlMXzO8HeB1uAzYvIsjhE3eO7cFFVN7s9YNkbIR+1WXM7wfQIHnLprg+8xbIa63Xl8f+YzxLIJa64MTfD1gsfgHdBf2zKqxzhwAAAABJRU5ErkJggg=="
+       style="display: none"/>
+  <img id="ceilingimg"
+       src="data:image/png;base64,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"
+       style="display: none"/>
   <div id="screen">
-    <canvas id="mainCanvas" width="640" height="400"></canvas>
+    <canvas id="mainCanvas"></canvas>
   </div>
-  <div id="minimapcontainer">
-    <canvas id="minimap"></canvas>
-    <canvas id="minimapobjects"></canvas>
+  <div style="display: flex; flex-direction: row; justify-content: center; align-content: center;">
+    <table cellspacing="10">
+      <tr>
+        <td>Ceiling Height</td>
+        <td>
+          <select name="ceilingHeight" id="ceilingHeight">
+            <option>1</option>
+            <option>2</option>
+            <option>3</option>
+            <option>4</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <td><label for="texturedCeilingOn">Textured Ceiling</label></td>
+        <td><input type="checkbox" id="texturedCeilingOn" checked="" /></td>
+      </tr>
+      <tr>
+        <td><label for="texturedFloorOn">Textured Floor</label></td>
+        <td><input type="checkbox" id="texturedFloorOn" checked="" /></td>
+      </tr>
+    </table>
+    <div id="minimapcontainer">
+      <canvas id="minimap"></canvas>
+      <canvas id="minimapobjects"></canvas>
+    </div>
   </div>
+
 
   <script type="text/javascript">
     var $ = function(id) { return document.getElementById(id); };
     var dc = function(tag) { return document.createElement(tag); };
+
+    function setPixel(imageData, x, y, r, g, b, a) {
+        let index = (x + y * imageData.width) * 4;
+        imageData.data[index+0] = r;
+        imageData.data[index+1] = g;
+        imageData.data[index+2] = b;
+        imageData.data[index+3] = a;
+    }
+
+    function getPixel(imageData, x, y) {
+        let index = (x + y * imageData.width) * 4;
+        return {
+          r : imageData.data[index+0],
+          g : imageData.data[index+1],
+          b : imageData.data[index+2],
+          a : imageData.data[index+3]
+        };
+    }
+
+    // Holds information about a wall hit from a single ray
+    class RayHit {
+        constructor() {
+          this.strip = 0; // screen column
+          this.tileX = 0; // where inside the wall that was hit, used for texture mapping
+          this.distance = 0; // distance between player and wall
+          this.correctDistance = 0; // distance to correct for fishbowl effect
+          this.horizontal = false; // horizontal wall hit?
+          this.wallType = 0; // type of wall
+          this.rayAngle = 0; // angle of ray hitting the wall
+        }
+    }
 
     var map = [
       [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
@@ -82,11 +146,11 @@ canvas#minimapobjects {
       [1,0,0,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
       [1,0,0,3,0,3,0,0,1,1,1,2,1,1,1,1,1,2,1,1,1,2,1,0,0,0,0,0,0,0,0,1],
       [1,0,0,3,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-      [1,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-      [1,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,1,1,1,1,1],
-      [1,0,0,3,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-      [1,0,0,3,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2],
-      [1,0,0,3,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,0,0,3,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,0,0,3,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,3,0,0,0,0,3,1,1,1,1,1],
+      [1,0,0,3,0,3,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,3,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,3,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,0,0,0,0,0,0,0,2],
+      [1,0,0,3,0,3,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
       [1,0,0,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,1,1,1,1,1],
       [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
       [1,0,0,0,0,0,0,0,0,3,3,3,0,0,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2],
@@ -103,36 +167,39 @@ canvas#minimapobjects {
       [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
     ];
 
-    // Length of a wall or cell in game units.
-    const TILE_SIZE = 128;
 
-    // length of wall textures in pixels
-    const TEXTURE_SIZE = 64;
+    const TILE_SIZE = 128; // Length of a wall or cell in game units.
+    const TEXTURE_SIZE = 64; // length of wall textures in pixels
+    const MAP_WIDTH = map[0].length;
+    const MAP_HEIGHT =  map.length;
+    const MINIMAP_SCALE = 8;
+    const DISPLAY_WIDTH = 640;
+    const DISPLAY_HEIGHT = 360;
+    const STRIP_WIDTH = 1;
+    const FOV_DEGREES = 90;
+    const FOV_RADIANS = FOV_DEGREES * Math.PI / 180; // FOV in radians
+    const RAY_COUNT = Math.ceil(DISPLAY_WIDTH / STRIP_WIDTH);
+    const VIEW_DIST = (DISPLAY_WIDTH/2) / Math.tan((FOV_RADIANS/2));
+    const TWO_PI = Math.PI * 2;
 
     var player = {
       x : 16 * TILE_SIZE, // current x, y position in game units
       y : 10 * TILE_SIZE,
+      z : 0,
       dir : 0,    // the direction that the player is turning, either -1 for left or 1 for right.
       rot : 0,    // the current angle of rotation. Counterclockwise is positive.
       speed : 0,    // is the playing moving forward (speed = 1) or backwards (speed = -1).
-      moveSpeed : (TILE_SIZE/4),  // how far (in map units) does the player move each step/update
+      moveSpeed : (TILE_SIZE/6),  // how far (in map units) does the player move each step/update
       rotSpeed : 4 * Math.PI / 180  // how much does the player rotate each step/update (in radians)
     }
 
-    const mapWidth = map[0].length;
-    const mapHeight =  map.length;
-    var miniMapScale = 8;
-    var screenWidth = 640;
-    var screenHeight = 400;
-    var stripWidth = 1;
-    var fovDegrees = 60;
-    var fov = fovDegrees * Math.PI / 180; // FOV in radians
-    var numRays = Math.ceil(screenWidth / stripWidth);
-    var viewDist = (screenWidth/2) / Math.tan((fov / 2));
-    var TWO_PI = Math.PI * 2;
-
+    var g_ceilingHeight = 1;
     var g_mainCanvas;
     var g_mainCanvasContext;
+    var g_backbuffer;
+    var g_floorimagedata;
+    var g_floorimagedata2;
+    var g_ceilingimagedata;
 
     function init() {
       bindKeys();
@@ -142,13 +209,16 @@ canvas#minimapobjects {
     }
 
     /*
+    This function is no longer called by us anymore because it interferes with the
+    pixel manipulation of floor/ceiling texture mapping.
+
     https://stackoverflow.com/a/46920541/1645045
     https://developer.mozilla.org/en-US/docs/Web/API/Window/devicePixelRatio
-    */
+
     function sharpenCanvas() {
       // Set display size (css pixels).
-      var sizew = screenWidth;
-      var sizeh = screenHeight;
+      var sizew = DISPLAY_WIDTH;
+      var sizeh = DISPLAY_HEIGHT;
       g_maincanvas.style.width = sizew + "px";
       g_maincanvas.style.height = sizeh + "px";
 
@@ -160,16 +230,35 @@ canvas#minimapobjects {
       // Normalize coordinate system to use css pixels.
       g_mainCanvasContext.scale(scale, scale);
     }
+    */
 
     function initScreen() {
       g_maincanvas = document.getElementById('mainCanvas');
       g_mainCanvasContext = g_maincanvas.getContext('2d');
       var screen = $("screen");
-      screen.style.width = screenWidth + "px";
-      screen.style.height = screenHeight + "px";
-      console.log("screenWidth="+screenWidth+", stripWidth="+stripWidth);
-      console.log("devicePixelRatio="+window.devicePixelRatio);
-      sharpenCanvas();
+      screen.style.width = DISPLAY_WIDTH + "px";
+      screen.style.height = DISPLAY_HEIGHT + "px";
+      g_maincanvas.width = DISPLAY_WIDTH;
+      g_maincanvas.height = DISPLAY_HEIGHT;
+      loadFloorCeilingImages();
+    }
+
+    function loadFloorCeilingImages() {
+      // Draw images on this temporary canvas to grab the ImageData pixels
+      let canvas = document.createElement('canvas');
+      canvas.width = TEXTURE_SIZE;
+      canvas.height = TEXTURE_SIZE;
+      let context = canvas.getContext('2d');
+
+      // Save floor image pixels
+      let floorimg = document.getElementById('floorimg');
+      context.drawImage(floorimg, 0, 0, floorimg.width, floorimg.height);
+      g_floorimagedata = context.getImageData(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
+
+      // Save ceiling image pixels
+      let ceilingimg = document.getElementById('ceilingimg');
+      context.drawImage(ceilingimg, 0, 0, ceilingimg.width, ceilingimg.height);
+      g_ceilingimagedata = context.getImageData(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
     }
 
     // bind keyboard events to game functions (movement, etc)
@@ -210,73 +299,194 @@ canvas#minimapobjects {
     function gameCycle() {
       move();
       updateMiniMap();
-      drawFloorAndCeilings();
-      castRays();
+      let rayHits = [];
+      castRays(rayHits);
+      drawWorld(rayHits);
       setTimeout(gameCycle,1000/60);
     }
 
-
-    function drawFloorAndCeilings() {
-
-      // Ceiling
-      // g_mainCanvasContext.fillStyle = "rgb(56,56,56)";
-      var ceilingGradient = g_mainCanvasContext.createLinearGradient(0, 0, 0, screenHeight/2);
-      ceilingGradient.addColorStop(0, "rgb(0,0,0)");
-      ceilingGradient.addColorStop(1, "rgb(100,100,255)");
-      g_mainCanvasContext.fillStyle = ceilingGradient;
-      g_mainCanvasContext.fillRect(0, 0, screenWidth, screenHeight/2);
-
-      // Floor
-      // g_mainCanvasContext.fillStyle = "rgb(112,112,112)";
-      var floorGradient = g_mainCanvasContext.createLinearGradient(0, screenHeight/2, 0, screenHeight);
-      floorGradient.addColorStop(0, "rgb(100,100,100)");
-      floorGradient.addColorStop(1, "rgb(188,188,188)");
-
-      // g_mainCanvasContext.fillStyle = "rgb(112,112,112)";
-      g_mainCanvasContext.fillStyle = floorGradient;
-      g_mainCanvasContext.fillRect(0, screenHeight/2, screenWidth, screenHeight/2);
-
+    function stripScreenHeight(screenDistance, correctDistance, heightInGame)
+    {
+      return Math.round(screenDistance/correctDistance*heightInGame);
     }
 
-    function castRays() {
+    function drawWallStrip(rayHit, textureX, textureY, wallScreenHeight)
+    {
+      let swidth = 1;
+      let sheight = TEXTURE_SIZE;
+      let imgx = rayHit.strip * STRIP_WIDTH;
+      let imgy = (DISPLAY_HEIGHT - wallScreenHeight)/2;
+      let imgw = STRIP_WIDTH;
+      let imgh = wallScreenHeight;
+      g_mainCanvasContext.drawImage(wallsimg,textureX,textureY,swidth,sheight,imgx,imgy,imgw,imgh);
+      for (let level=1; level<g_ceilingHeight; ++level) {
+        g_mainCanvasContext.drawImage(wallsimg,textureX,textureY,swidth,sheight,imgx,imgy-level*wallScreenHeight,imgw,imgh);
+      }
+    }
+
+    function drawFloor(rayHits)
+    {
+      let texturedFloorOn = $("texturedFloorOn").checked;
+
+      // Solid Color
+      if (false===texturedFloorOn) {
+        for (let y=DISPLAY_HEIGHT/2; y<DISPLAY_HEIGHT; ++y) {
+          for (let x=0; x<DISPLAY_WIDTH; ++x) {
+            setPixel(g_backbuffer, x, y, 113, 113, 113, 255);
+          }
+        }
+        return;
+      }
+
+      // Textured
+      for (let i=0; i<rayHits.length; ++i) {
+        let rayHit = rayHits[ i ];
+        let wallScreenHeight = stripScreenHeight(VIEW_DIST, rayHit.correctDistance, TILE_SIZE);
+        let centerPlane = DISPLAY_HEIGHT / 2;
+        let eyeHeight = TILE_SIZE/2 + player.z;
+        let screenX = rayHit.strip * STRIP_WIDTH;
+        let screenY = Math.floor((DISPLAY_HEIGHT-wallScreenHeight)/2) + wallScreenHeight;
+        if (screenY < centerPlane) {
+          screenY = centerPlane;
+        }
+        let cosFactor = 1/Math.cos(player.rot-rayHit.rayAngle);
+        for (; screenY<DISPLAY_HEIGHT; screenY++)
+        {
+          let straightDistance = (VIEW_DIST*eyeHeight)/(screenY-centerPlane);
+          let diagonalDistance = straightDistance * cosFactor;
+
+          let xEnd = diagonalDistance *  Math.cos(rayHit.rayAngle);
+          let yEnd = diagonalDistance * -Math.sin(rayHit.rayAngle);
+
+          xEnd += player.x;
+          yEnd += player.y;
+
+          let x = Math.floor(xEnd) % TILE_SIZE;
+          let y = Math.floor(yEnd) % TILE_SIZE;
+
+          let tileX = Math.floor(xEnd / TILE_SIZE);
+          let tileY = Math.floor(yEnd / TILE_SIZE);
+          if ( x < 0 || y < 0 || tileX >= MAP_WIDTH || tileY >= MAP_HEIGHT ) {
+            continue;
+          }
+          let textureX = Math.floor(x / TILE_SIZE * TEXTURE_SIZE);
+          let textureY = Math.floor(y / TILE_SIZE * TEXTURE_SIZE);
+          let srcPixel = getPixel(g_floorimagedata, textureX, textureY);
+          setPixel(g_backbuffer, screenX, screenY, srcPixel.r, srcPixel.g, srcPixel.b, 255);
+        }
+      }
+    }
+
+    function drawCeiling(rayHits)
+    {
+      let texturedCeilingOn = $("texturedCeilingOn").checked;
+
+      // Solid Color
+      if (false===texturedCeilingOn) {
+        for (let y=0; y<DISPLAY_HEIGHT/2; ++y) {
+          for (let x=0; x<DISPLAY_WIDTH; ++x) {
+            setPixel(g_backbuffer, x, y, 56, 56, 56, 255);
+          }
+        }
+        return;
+      }
+
+      for (let i=0; i<rayHits.length; ++i) {
+        let rayHit = rayHits[ i ];
+        let wallScreenHeight = stripScreenHeight(VIEW_DIST, rayHit.correctDistance, TILE_SIZE);
+        let centerPlane = DISPLAY_HEIGHT / 2;
+        let eyeHeight = TILE_SIZE/2 + player.z;
+        let highestCeilingTop = g_ceilingHeight*TILE_SIZE;
+        let screenX = rayHit.strip * STRIP_WIDTH;
+        let screenY = Math.floor((DISPLAY_HEIGHT-wallScreenHeight)/2) + wallScreenHeight-1;
+        if (screenY < centerPlane) {
+          screenY = centerPlane;
+        }
+        let cosFactor = 1/Math.cos(player.rot-rayHit.rayAngle);
+        for (;screenY>=0;screenY--)
+        {
+          let ceilingHeight = TILE_SIZE * g_ceilingHeight;
+          let straightDistance = (VIEW_DIST*(ceilingHeight-eyeHeight)) / (centerPlane-screenY);
+          let diagonalDistance = straightDistance * cosFactor;
+
+          let xEnd = diagonalDistance *  Math.cos(rayHit.rayAngle);
+          let yEnd = diagonalDistance * -Math.sin(rayHit.rayAngle);
+
+          xEnd += player.x;
+          yEnd += player.y;
+
+          let x = Math.floor(xEnd) % TILE_SIZE;
+          let y = Math.floor(yEnd) % TILE_SIZE;
+
+          let tileX = Math.floor(xEnd / TILE_SIZE);
+          let tileY = Math.floor(yEnd / TILE_SIZE);
+          if ( x < 0 || y < 0 || tileX >= MAP_WIDTH || tileY >= MAP_HEIGHT ) {
+            continue;
+          }
+          let textureX = Math.floor(x / TILE_SIZE * TEXTURE_SIZE);
+          let textureY = Math.floor(y / TILE_SIZE * TEXTURE_SIZE);
+          let srcPixel;
+          if ( (tileX+tileY)%2 ) {
+            srcPixel = getPixel(g_ceilingimagedata, textureX, textureY);
+          }
+          else {
+            srcPixel = getPixel(g_ceilingimagedata, textureX, textureY);
+          }
+          setPixel(g_backbuffer, screenX, screenY, srcPixel.r, srcPixel.g, srcPixel.b, 255);
+        }
+      }
+    }
+
+    function drawWorld(rayHits)
+    {
+      g_ceilingHeight = $("ceilingHeight").value;
+      g_backbuffer = g_mainCanvasContext.createImageData(DISPLAY_WIDTH, DISPLAY_HEIGHT);
+
+      drawFloor(rayHits);
+      drawCeiling(rayHits);
+      g_mainCanvasContext.putImageData(g_backbuffer, 0, 0);
+
+      let wallsimg = document.getElementById("wallsimg");
+
+      for (let i=0; i<rayHits.length; ++i) {
+        let rayHit = rayHits[ i ];
+        let wallScreenHeight = Math.round(VIEW_DIST / rayHit.correctDistance*TILE_SIZE);
+        let textureX = (rayHit.horizontal?TEXTURE_SIZE-1:0) + (rayHit.tileX/TILE_SIZE*TEXTURE_SIZE);
+        let textureY = TEXTURE_SIZE * (rayHit.wallType-1);
+        drawWallStrip(rayHit, textureX, textureY, wallScreenHeight);
+      }
+    }
+
+    function castRays(rayHits) {
       var stripIdx = 0;
 
-      for (var i=0;i<numRays;i++) {
-
-        // Original Ray Angle calculation from  Jacob Seidelin's article.
-        // Changed to use atan instead of asin
-
+      for (var i=0;i<RAY_COUNT;i++) {
         /*
               screenX
                     <------
-                    +-----+------+  +-
+                    +-----+------+  ^
                     \     |     /   |
                      \    |    /    |
-        rayViewDist   \   |   /     | viewDist aka projectionPlaneDistance
+                      \   |   /     | VIEW_DIST
                        \  |  /      |
                         \a| /       |
                          \|/        |
-                          v         |_
+                          v         v
 
-        a = atan( screenX / viewDist )
+        tan(a) = screenX / VIEW_DIST
+        a = atan( screenX / VIEW_DIST )
         */
-        var screenX = (numRays/2 - i) * stripWidth;
-        var rayAngle = Math.atan(screenX / viewDist);
-
-        // Alternative code below causes fisheye effect near edges
-        // https://stackoverflow.com/questions/24173966/raycasting-engine-rendering-creating-slight-distortion-increasing-towards-edges
-        // var leftmostAngle = (fovDegrees/numRays) * -(numRays/2);
-        // var rayAngle = leftmostAngle + (fovDegrees/numRays) * i;
-        // rayAngle = -rayAngle * Math.PI / 180; // convert to radians
-
+        var screenX = (RAY_COUNT/2 - i) * STRIP_WIDTH;
+        var rayAngle = Math.atan(screenX / VIEW_DIST);
         castSingleRay(
+          rayHits,
           player.rot + rayAngle,  // add the players viewing direction to get the angle in world space
           stripIdx++
         );
       }
     }
 
-    function castSingleRay(rayAngle, stripIdx) {
+    function castSingleRay(rayHits, rayAngle, stripIdx) {
       rayAngle %= TWO_PI;
       if (rayAngle < 0) rayAngle += TWO_PI;
 
@@ -294,9 +504,7 @@ canvas#minimapobjects {
       var wallHorizontal = false;
 
       //--------------------------
-      //
       // Vertical Lines Checking
-      //
       //--------------------------
 
       // Find x coordinate of vertical lines on the right and left
@@ -322,7 +530,7 @@ canvas#minimapobjects {
         stepy = -stepy;
       }
 
-      while (vx >= 0 && vx < mapWidth*TILE_SIZE && vy >= 0 && vy < mapHeight*TILE_SIZE) {
+      while (vx >= 0 && vx < MAP_WIDTH*TILE_SIZE && vy >= 0 && vy < MAP_HEIGHT*TILE_SIZE) {
         var wallY = Math.floor(vy / TILE_SIZE);
         var wallX = Math.floor(vx / TILE_SIZE);
         if (map[wallY][wallX] > 0) {
@@ -348,12 +556,10 @@ canvas#minimapobjects {
       }
 
       //--------------------------
-      //
       // Horizontal Lines Checking
-      //
       //--------------------------
 
-      // Find y coordinate of horizontal lines on the right and left
+      // Find y coordinate of horizontal lines above and below
       var hy = 0;
       if (up) {
         hy = Math.floor(player.y/TILE_SIZE) * TILE_SIZE - 1;
@@ -374,7 +580,7 @@ canvas#minimapobjects {
         stepx = -stepx;
       }
 
-      while (hx >= 0 && hx < mapWidth*TILE_SIZE && hy >= 0 && hy < mapHeight*TILE_SIZE) {
+      while (hx >= 0 && hx < MAP_WIDTH*TILE_SIZE && hy >= 0 && hy < MAP_HEIGHT*TILE_SIZE) {
         var wallY = Math.floor(hy / TILE_SIZE);
         var wallX = Math.floor(hx / TILE_SIZE);
         if (map[wallY][wallX] > 0) {
@@ -400,51 +606,34 @@ canvas#minimapobjects {
         hy += stepy;
       }
 
-
+      rayHit = new RayHit();
+      rayHit.strip = stripIdx;
+      rayHit.tileX = textureX;
+      rayHit.horizontal = wallHorizontal;
+      rayHit.wallType = wallType;
+      rayHit.rayAngle = rayAngle;
       if (dist) {
+        rayHit.distance = Math.sqrt(dist);
+        rayHit.correctDistance = rayHit.distance * Math.cos( player.rot - rayAngle );
         drawRay(xHit, yHit);
-        dist = Math.sqrt(dist);
-
-        // use perpendicular distance to adjust for fish eye
-        // distorted_dist = correct_dist / cos(relative_angle_of_ray)
-        dist = dist * Math.cos( player.rot - rayAngle );
-
-        // "real" wall height in the game world is 1 unit, the distance from the player to the screen is viewDist,
-        // thus the height on the screen is equal to wall_height_real * viewDist / dist
-        var wallScreenHeight = Math.round(viewDist / dist*TILE_SIZE);
-
-        var g_mainCanvas = document.getElementById("mainCanvas");
-        var g_mainCanvasContext = g_mainCanvas.getContext("2d");
-        var wallsimg = document.getElementById("wallsimg");
-
-        var sx = (wallHorizontal?TEXTURE_SIZE-1:0) + (textureX/TILE_SIZE*TEXTURE_SIZE);
-        var sy = TEXTURE_SIZE * (wallType-1);
-        var swidth = 1;
-        var sheight = TEXTURE_SIZE;
-        var imgx = stripIdx * stripWidth;
-        var imgy = (screenHeight - wallScreenHeight)/2;
-        var imgw = stripWidth;
-        var imgh = wallScreenHeight;
-        g_mainCanvasContext.imageSmoothingEnabled = false;
-        g_mainCanvasContext.drawImage(wallsimg,sx,sy,swidth,sheight,imgx,imgy,imgw,imgh);
       }
-
+      rayHits.push(rayHit);
     }
 
     function drawRay(rayX, rayY) {
       var miniMapObjects = $("minimapobjects");
       var objectCtx = miniMapObjects.getContext("2d");
 
-      rayX = rayX / (mapWidth*TILE_SIZE) * 100;
-      rayX = rayX/100 * miniMapScale * mapWidth;
-      rayY = rayY / (mapHeight*TILE_SIZE) * 100;
-      rayY = rayY/100 * miniMapScale * mapHeight;
+      rayX = rayX / (MAP_WIDTH*TILE_SIZE) * 100;
+      rayX = rayX/100 * MINIMAP_SCALE * MAP_WIDTH;
+      rayY = rayY / (MAP_HEIGHT*TILE_SIZE) * 100;
+      rayY = rayY/100 * MINIMAP_SCALE * MAP_HEIGHT;
 
-      var playerX = player.x / (mapWidth*TILE_SIZE) * 100;
-      playerX = playerX/100 * miniMapScale * mapWidth;
+      var playerX = player.x / (MAP_WIDTH*TILE_SIZE) * 100;
+      playerX = playerX/100 * MINIMAP_SCALE * MAP_WIDTH;
 
-      var playerY = player.y / (mapHeight*TILE_SIZE) * 100;
-      playerY = playerY/100 * miniMapScale * mapHeight;
+      var playerY = player.y / (MAP_HEIGHT*TILE_SIZE) * 100;
+      playerY = playerY/100 * MINIMAP_SCALE * MAP_HEIGHT;
 
       objectCtx.strokeStyle = "rgba(0,100,0,0.3)";
       objectCtx.lineWidth = 0.5;
@@ -494,7 +683,7 @@ canvas#minimapobjects {
     function isBlocking(x,y) {
 
       // first make sure that we cannot move outside the boundaries of the level
-      if (y < 0 || y >= mapHeight || x < 0 || x >= mapWidth)
+      if (y < 0 || y >= MAP_HEIGHT || x < 0 || x >= MAP_WIDTH)
         return true;
 
       // return true if the map block is not 0, ie. if there is a blocking wall.
@@ -510,11 +699,11 @@ canvas#minimapobjects {
 
       miniMapObjects.width = miniMapObjects.width;
 
-      var playerX = player.x / (mapWidth*TILE_SIZE) * 100;
-      playerX = playerX/100 * miniMapScale * mapWidth;
+      var playerX = player.x / (MAP_WIDTH*TILE_SIZE) * 100;
+      playerX = playerX/100 * MINIMAP_SCALE * MAP_WIDTH;
 
-      var playerY = player.y / (mapHeight*TILE_SIZE) * 100;
-      playerY = playerY/100 * miniMapScale * mapHeight;
+      var playerY = player.y / (MAP_HEIGHT*TILE_SIZE) * 100;
+      playerY = playerY/100 * MINIMAP_SCALE * MAP_HEIGHT;
 
       objectCtx.fillStyle = "red";
       objectCtx.fillRect(   // draw a dot at the current player position
@@ -527,47 +716,42 @@ canvas#minimapobjects {
       objectCtx.beginPath();
       objectCtx.moveTo(playerX , playerY );
       objectCtx.lineTo(
-        (playerX +  Math.cos(player.rot) * 4 * miniMapScale) ,
-        (playerY + -Math.sin(player.rot) * 4 * miniMapScale)
+        (playerX +  Math.cos(player.rot) * 4 * MINIMAP_SCALE) ,
+        (playerY + -Math.sin(player.rot) * 4 * MINIMAP_SCALE)
       );
       objectCtx.closePath();
       objectCtx.stroke();
     }
 
     function drawMiniMap() {
+      let miniMap = $("minimap");     // the actual map
+      let miniMapCtr = $("minimapcontainer");   // the container div element
+      let miniMapObjects = $("minimapobjects"); // the canvas used for drawing the objects on the map (player character, etc)
 
-      // draw the topdown view minimap
-
-      var miniMap = $("minimap");     // the actual map
-      var miniMapCtr = $("minimapcontainer");   // the container div element
-      var miniMapObjects = $("minimapobjects"); // the canvas used for drawing the objects on the map (player character, etc)
-
-      miniMap.width = mapWidth * miniMapScale;  // resize the internal canvas dimensions
-      miniMap.height = mapHeight * miniMapScale;  // of both the map canvas and the object canvas
+      miniMap.width = MAP_WIDTH * MINIMAP_SCALE;  // resize the internal canvas dimensions
+      miniMap.height = MAP_HEIGHT * MINIMAP_SCALE;  // of both the map canvas and the object canvas
       miniMapObjects.width = miniMap.width;
       miniMapObjects.height = miniMap.height;
 
-      var w = (mapWidth * miniMapScale) + "px"  // minimap CSS dimensions
-      var h = (mapHeight * miniMapScale) + "px"
+      let w = (MAP_WIDTH * MINIMAP_SCALE) + "px"  // minimap CSS dimensions
+      let h = (MAP_HEIGHT * MINIMAP_SCALE) + "px"
       miniMap.style.width = miniMapObjects.style.width = miniMapCtr.style.width = w;
       miniMap.style.height = miniMapObjects.style.height = miniMapCtr.style.height = h;
 
-
-      var ctx = miniMap.getContext("2d");
-
+      let ctx = miniMap.getContext("2d");
       ctx.fillStyle = "white";
       ctx.fillRect(0,0,miniMap.width,miniMap.height);
 
       // loop through all blocks on the map
-      for (var y=0;y<mapHeight;y++) {
-        for (var x=0;x<mapWidth;x++) {
-          var wall = map[y][x];
+      for (let y=0;y<MAP_HEIGHT;y++) {
+        for (let x=0;x<MAP_WIDTH;x++) {
+          let wall = map[y][x];
           if (wall > 0) { // if there is a wall block at this (x,y) ...
             ctx.fillStyle = "rgb(200,200,200)";
             ctx.fillRect(       // ... then draw a block on the minimap
-              x * miniMapScale,
-              y * miniMapScale,
-              miniMapScale,miniMapScale
+              x * MINIMAP_SCALE,
+              y * MINIMAP_SCALE,
+              MINIMAP_SCALE,MINIMAP_SCALE
             );
           }
         }
@@ -575,6 +759,6 @@ canvas#minimapobjects {
 
       updateMiniMap();
     }
-    setTimeout(init, 1);
+    setTimeout(init, 500);
   </script>
 </body>
