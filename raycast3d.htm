@@ -194,6 +194,7 @@ canvas#minimapobjects {
       rotSpeed : 4 * Math.PI / 180  // how much does the player rotate each step/update (in radians)
     }
 
+    var g_rayAngles = null;
     var g_ceilingHeight = 1;
     var g_mainCanvas;
     var g_mainCanvasContext;
@@ -206,6 +207,7 @@ canvas#minimapobjects {
       bindKeys();
       initScreen();
       drawMiniMap();
+      createRayAngles();
       gameCycle();
     }
 
@@ -458,32 +460,41 @@ canvas#minimapobjects {
       }
     }
 
-    function castRays(rayHits) {
-      var stripIdx = 0;
+    /*
+      Calculate and save the ray angles from left to right of screen.
 
-      for (var i=0;i<RAY_COUNT;i++) {
-        /*
-              screenX
-                    <------
-                    +-----+------+  ^
-                    \     |     /   |
-                     \    |    /    |
-                      \   |   /     | VIEW_DIST
-                       \  |  /      |
-                        \a| /       |
-                         \|/        |
-                          v         v
+            screenX
+            <------
+            +-----+------+  ^
+            \     |     /   |
+             \    |    /    |
+              \   |   /     | VIEW_DIST
+               \  |  /      |
+                \a| /       |
+                 \|/        |
+                  v         v
 
-        tan(a) = screenX / VIEW_DIST
-        a = atan( screenX / VIEW_DIST )
-        */
-        var screenX = (RAY_COUNT/2 - i) * STRIP_WIDTH;
-        var rayAngle = Math.atan(screenX / VIEW_DIST);
-        castSingleRay(
-          rayHits,
-          player.rot + rayAngle,  // add the players viewing direction to get the angle in world space
-          stripIdx++
-        );
+      tan(a) = screenX / VIEW_DIST
+      a = atan( screenX / VIEW_DIST )
+    */
+    function createRayAngles()
+    {
+      if (!g_rayAngles) {
+        g_rayAngles = [];
+        for (let i=0;i<RAY_COUNT;i++) {
+          let screenX = (RAY_COUNT/2 - i) * STRIP_WIDTH
+          let rayAngle = Math.atan(screenX / VIEW_DIST)
+          g_rayAngles.push(rayAngle)
+        }
+        console.log("No. of ray angles="+g_rayAngles.length);
+      }
+    }
+
+    function castRays(rayHits)
+    {
+      for (let i=0; i<g_rayAngles.length; i++) {
+        let rayAngle =  g_rayAngles[i];
+        castSingleRay(rayHits, player.rot + rayAngle, i);
       }
     }
 
@@ -606,6 +617,7 @@ canvas#minimapobjects {
         hx += stepx;
         hy += stepy;
       }
+
 
       rayHit = new RayHit();
       rayHit.strip = stripIdx;
