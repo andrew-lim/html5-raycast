@@ -10,7 +10,7 @@ Heavily modified from [this article by Jacob Seidelin](http://dev.opera.com/arti
 
 Main Differences from original article:
 - **A single &lt;canvas&gt;** is now used for rendering the main scene. In the original article &lt;div&gt; and &lt;img&gt; strips
-  were used to render the walls, floor and ceiling. The walls are now drawn using the Canvas **drawImage()** function.
+  were used to render the walls, floor and ceiling. The walls are now drawn by manually setting the canvas pixels.
 - **Unit circle coordinates** are now used for the player's rotation. So turning left counterclockwise
   is a positive angle.
 - **Walls and tiles now use fixed game units**. The player's position in a tile is no longer a floating point
