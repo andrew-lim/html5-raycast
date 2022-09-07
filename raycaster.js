@@ -76,7 +76,7 @@ class Raycaster
   {
     this.initMap()
     this.initPlayer()
-    this.stripWidth = 1
+    this.stripWidth = 1 // leave this at 1 for now
     this.ceilingHeight = 1 // ceiling height in blocks
     this.mainCanvas = mainCanvas
     this.mapWidth = this.map[0].length
@@ -89,6 +89,7 @@ class Raycaster
     this.fovRadians = fovDegrees * Math.PI / 180
     this.viewDist = (this.displayWidth/2) / Math.tan((this.fovRadians/2))
     this.rayAngles = null
+    this.viewDistances = null
     this.backBuffer = null
 
     this.mainCanvasContext;
@@ -123,11 +124,12 @@ class Raycaster
 }
 
   init() {
-    this.bindKeys();
-    this.initScreen();
-    this.drawMiniMap();
-    this.createRayAngles();
-    this.gameCycle();
+    this.bindKeys()
+    this.initScreen()
+    this.drawMiniMap()
+    this.createRayAngles()
+    this.createViewDistances()
+    this.gameCycle()
   }
 
   /*
@@ -304,6 +306,69 @@ class Raycaster
     }
   }
 
+  /*
+    Floor Casting Algorithm:
+    We want to find the location where the ray hits the floor (F)
+    1. Find the distance of F from the player's "feet"
+    2. Rotate the distance using the current ray angle to find F
+       relative to the player
+    3. Translate the F using the player's position to get its
+       world coordinates
+    4. Map the world coordinates to texture coordinates
+
+    Step 1 is the most complicated and the following explains how to
+    calculate the floor distance
+
+    ===================[ Floor Casting Side View ]=======================
+    Refer to the diagram below. To get the floor distance relative to the
+    player, we can use similar triangle principle:
+       floorDistance / eyeHeight = currentViewDistance / dy
+       floorDistance = eyeHeight * currentViewDistance / dy
+
+                              current
+                          <-view distance->
+                          +----------------eye  -
+                          |              / ^    ^
+                          |          /     |    |<-- dy
+                          |      /         |    |
+        ray               |  /             |    v
+           \              y----------------|    -
+            \         /   |                |
+             \    /       |<--view         |<--eyeHeight
+              /           |   plane        |
+          /               |                |
+      /                   |                v
+     F---------------------------------------- Floor bottom
+     <----------  floorDistance  ---------->
+
+    ======================[ Floor Casting Top View ]=====================
+    But we need to know the current view distance.
+    The view distance is not constant!
+    In the center of the screen the distance is shortest.
+    But for other angles it changes and is longer.
+
+                               player center ray
+                        F         |
+                         \        |
+                          \ <-dx->|
+                 ----------x------+-- view plane -----
+       currentViewDistance  \     |               ^
+                     |       \    |               |
+                     +----->  \   |        center view distance
+                               \  |               |
+                                \ |               |
+                                 \|               v
+                                  O--------------------
+
+     We can calculate the current view distance using Pythogaras theorem:
+       x  = current strip x
+       dx = distance of x from center of screen
+       dx = abs(screenWidth/2 - x)
+       currentViewDistance = sqrt(dx*dx + viewDist*viewDist)
+
+     We calculate and save all the view distances in this.viewDistances using
+     createViewDistances()
+  */
   drawTexturedFloor(rayHits)
   {
     for (let i=0; i<rayHits.length; ++i) {
@@ -312,18 +377,17 @@ class Raycaster
       const centerPlane = this.displayHeight / 2;
       const eyeHeight = this.tileSize/2 + this.player.z;
       const screenX = rayHit.strip * this.stripWidth;
+      const currentViewDistance = this.viewDistances[rayHit.strip]
       const worldMaxX = this.mapWidth  * this.tileSize
       const worldMaxY = this.mapHeight * this.tileSize
-      const cosDiagonalAngle = Math.cos(rayHit.rayAngle-this.player.rot)
       const cosRayAngle = Math.cos(rayHit.rayAngle)
       const sinRayAngle = Math.sin(rayHit.rayAngle)
       let screenY = Math.max(centerPlane, Math.floor((this.displayHeight-wallScreenHeight)/2) + wallScreenHeight)
-      for (; screenY<this.displayHeight; screenY++)
-      {
-        let straightDistance =  (this.viewDist*eyeHeight)/(screenY-centerPlane)
-        let diagonalDistance =  straightDistance / cosDiagonalAngle
-        let worldX = this.player.x + diagonalDistance * cosRayAngle
-        let worldY = this.player.y + diagonalDistance * -sinRayAngle
+      for (; screenY<this.displayHeight; screenY++) {
+        let dy = screenY-centerPlane
+        let floorDistance = (currentViewDistance * eyeHeight) / dy
+        let worldX = this.player.x + floorDistance * cosRayAngle
+        let worldY = this.player.y + floorDistance * -sinRayAngle
         if (worldX<0 || worldY<0 || worldX>=worldMaxX || worldY>=worldMaxY) {
           continue;
         }
@@ -347,19 +411,18 @@ class Raycaster
       const centerPlane = this.displayHeight / 2;
       const eyeHeight = this.tileSize/2 + this.player.z;
       const screenX = rayHit.strip * this.stripWidth;
+      const currentViewDistance = this.viewDistances[rayHit.strip]
       const worldMaxX = this.mapWidth  * this.tileSize
       const worldMaxY = this.mapHeight * this.tileSize
-      const cosDiagonalAngle = Math.cos(rayHit.rayAngle-this.player.rot)
       const cosRayAngle = Math.cos(rayHit.rayAngle)
       const sinRayAngle = Math.sin(rayHit.rayAngle)
+      const currentCeilingHeight = this.tileSize * this.ceilingHeight
       let screenY = Math.min(centerPlane-1, Math.floor((this.displayHeight-wallScreenHeight)/2)-1)
-      for (; screenY>=0; screenY--)
-      {
-        let ceilingHeight = this.tileSize * this.ceilingHeight;
-        let straightDistance = (this.viewDist*(ceilingHeight-eyeHeight)) / (centerPlane-screenY);
-        let diagonalDistance = straightDistance / cosDiagonalAngle
-        let worldX = this.player.x + diagonalDistance * cosRayAngle
-        let worldY = this.player.y + diagonalDistance * -sinRayAngle
+      for (; screenY>=0; screenY--) {
+        let dy = centerPlane-screenY
+        let ceilingDistance = (currentViewDistance * (currentCeilingHeight-eyeHeight)) / dy
+        let worldX = this.player.x + ceilingDistance * cosRayAngle
+        let worldY = this.player.y + ceilingDistance * -sinRayAngle
         if (worldX<0 || worldY<0 || worldX>=worldMaxX || worldY>=worldMaxY) {
           continue;
         }
@@ -430,6 +493,22 @@ class Raycaster
         this.rayAngles.push(rayAngle)
       }
       console.log("No. of ray angles="+this.rayAngles.length);
+    }
+  }
+
+  /**
+    Calculate and save the view distances from left to right of screen.
+  */
+  createViewDistances()
+  {
+    if (!this.viewDistances) {
+      this.viewDistances = [];
+      for (let x=0; x<this.rayCount; x++) {
+        let dx = (this.rayCount/2 - x) * this.stripWidth
+        let currentViewDistance = Math.sqrt(dx*dx + this.viewDist*this.viewDist)
+        this.viewDistances.push(currentViewDistance)
+      }
+      console.log("No. of view distances="+this.viewDistances.length);
     }
   }
 
