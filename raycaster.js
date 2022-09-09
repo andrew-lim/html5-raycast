@@ -85,6 +85,8 @@ class Raycaster
     this.displayHeight = displayHeight
     this.rayCount = Math.ceil(displayWidth / this.stripWidth)
     this.tileSize = tileSize
+    this.worldWidth = this.mapWidth * this.tileSize
+    this.worldHeight = this.mapHeight * this.tileSize
     this.textureSize = textureSize
     this.fovRadians = fovDegrees * Math.PI / 180
     this.viewDist = (this.displayWidth/2) / Math.tan((this.fovRadians/2))
@@ -380,8 +382,6 @@ class Raycaster
       const eyeHeight = this.tileSize/2 + this.player.z;
       const screenX = rayHit.strip * this.stripWidth;
       const currentViewDistance = this.viewDistances[rayHit.strip]
-      const worldMaxX = this.mapWidth  * this.tileSize
-      const worldMaxY = this.mapHeight * this.tileSize
       const cosRayAngle = Math.cos(rayHit.rayAngle)
       const sinRayAngle = Math.sin(rayHit.rayAngle)
       let screenY = Math.max(centerY, Math.floor((this.displayHeight-wallScreenHeight)/2) + wallScreenHeight)
@@ -390,7 +390,7 @@ class Raycaster
         let floorDistance = (currentViewDistance * eyeHeight) / dy
         let worldX = this.player.x + floorDistance * cosRayAngle
         let worldY = this.player.y + floorDistance * -sinRayAngle
-        if (worldX<0 || worldY<0 || worldX>=worldMaxX || worldY>=worldMaxY) {
+        if (worldX<0 || worldY<0 || worldX>=this.worldWidth || worldY>=this.worldHeight) {
           continue;
         }
         let textureX = Math.floor(worldX) % this.tileSize;
@@ -414,8 +414,6 @@ class Raycaster
       const eyeHeight = this.tileSize/2 + this.player.z;
       const screenX = rayHit.strip * this.stripWidth;
       const currentViewDistance = this.viewDistances[rayHit.strip]
-      const worldMaxX = this.mapWidth  * this.tileSize
-      const worldMaxY = this.mapHeight * this.tileSize
       const cosRayAngle = Math.cos(rayHit.rayAngle)
       const sinRayAngle = Math.sin(rayHit.rayAngle)
       const currentCeilingHeight = this.tileSize * this.ceilingHeight
@@ -425,7 +423,7 @@ class Raycaster
         let ceilingDistance = (currentViewDistance * (currentCeilingHeight-eyeHeight)) / dy
         let worldX = this.player.x + ceilingDistance * cosRayAngle
         let worldY = this.player.y + ceilingDistance * -sinRayAngle
-        if (worldX<0 || worldY<0 || worldX>=worldMaxX || worldY>=worldMaxY) {
+        if (worldX<0 || worldY<0 || worldX>=this.worldWidth || worldY>=this.worldHeight) {
           continue;
         }
         let textureX = Math.floor(worldX) % this.tileSize;
