@@ -322,23 +322,25 @@ class Raycaster
     ===================[ Floor Casting Side View ]=======================
     Refer to the diagram below. To get the floor distance relative to the
     player, we can use similar triangle principle:
+       dy = height between current screen y and center y
+          = y - (displayHeight/2)
        floorDistance / eyeHeight = currentViewDistance / dy
        floorDistance = eyeHeight * currentViewDistance / dy
 
-                              current
+                               current
                           <-view distance->
-                          +----------------eye  -
-                          |              / ^    ^
-                          |          /     |    |<-- dy
-                          |      /         |    |
-        ray               |  /             |    v
-           \              y----------------|    -
+                       -  +----------------E <-eye
+                       ^  |              / ^
+                 dy--> |  |          /     |
+                       |  |      /         |
+        ray            v  |  /             |
+           \           -  y                |<--eyeHeight
             \         /   |                |
-             \    /       |<--view         |<--eyeHeight
+             \    /       |<--view         |
               /           |   plane        |
           /               |                |
       /                   |                v
-     F---------------------------------------- Floor bottom
+     F--------------------------------------  Floor bottom
      <----------  floorDistance  ---------->
 
     ======================[ Floor Casting Top View ]=====================
@@ -374,7 +376,7 @@ class Raycaster
     for (let i=0; i<rayHits.length; ++i) {
       const rayHit = rayHits[ i ];
       const wallScreenHeight = this.stripScreenHeight(this.viewDist, rayHit.correctDistance, this.tileSize);
-      const centerPlane = this.displayHeight / 2;
+      const centerY = this.displayHeight / 2;
       const eyeHeight = this.tileSize/2 + this.player.z;
       const screenX = rayHit.strip * this.stripWidth;
       const currentViewDistance = this.viewDistances[rayHit.strip]
@@ -382,9 +384,9 @@ class Raycaster
       const worldMaxY = this.mapHeight * this.tileSize
       const cosRayAngle = Math.cos(rayHit.rayAngle)
       const sinRayAngle = Math.sin(rayHit.rayAngle)
-      let screenY = Math.max(centerPlane, Math.floor((this.displayHeight-wallScreenHeight)/2) + wallScreenHeight)
+      let screenY = Math.max(centerY, Math.floor((this.displayHeight-wallScreenHeight)/2) + wallScreenHeight)
       for (; screenY<this.displayHeight; screenY++) {
-        let dy = screenY-centerPlane
+        let dy = screenY-centerY
         let floorDistance = (currentViewDistance * eyeHeight) / dy
         let worldX = this.player.x + floorDistance * cosRayAngle
         let worldY = this.player.y + floorDistance * -sinRayAngle
@@ -408,7 +410,7 @@ class Raycaster
     for (let i=0; i<rayHits.length; ++i) {
       const rayHit = rayHits[ i ];
       const wallScreenHeight = this.stripScreenHeight(this.viewDist, rayHit.correctDistance, this.tileSize);
-      const centerPlane = this.displayHeight / 2;
+      const centerY = this.displayHeight / 2;
       const eyeHeight = this.tileSize/2 + this.player.z;
       const screenX = rayHit.strip * this.stripWidth;
       const currentViewDistance = this.viewDistances[rayHit.strip]
@@ -417,9 +419,9 @@ class Raycaster
       const cosRayAngle = Math.cos(rayHit.rayAngle)
       const sinRayAngle = Math.sin(rayHit.rayAngle)
       const currentCeilingHeight = this.tileSize * this.ceilingHeight
-      let screenY = Math.min(centerPlane-1, Math.floor((this.displayHeight-wallScreenHeight)/2)-1)
+      let screenY = Math.min(centerY-1, Math.floor((this.displayHeight-wallScreenHeight)/2)-1)
       for (; screenY>=0; screenY--) {
-        let dy = centerPlane-screenY
+        let dy = centerY-screenY
         let ceilingDistance = (currentViewDistance * (currentCeilingHeight-eyeHeight)) / dy
         let worldX = this.player.x + ceilingDistance * cosRayAngle
         let worldY = this.player.y + ceilingDistance * -sinRayAngle
