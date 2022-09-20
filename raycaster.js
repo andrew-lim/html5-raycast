@@ -5,9 +5,26 @@ https://github.com/andrew-lim/html5-raycast
 ---------------------------------------------**/
 'use strict';
 
+class Sprite
+{
+  constructor(x=0, y=0, z=0, w=128, h=128)
+  {
+    this.x = x
+    this.y = y
+    this.z = w
+    this.w = w
+    this.h = h
+    this.hit = false
+  }
+}
+
 // Holds information about a wall hit from a single ray
-class RayHit {
-    constructor() {
+class RayHit
+{
+    constructor()
+    {
+      this.x = 0; // world coordinates of hit
+      this.y = 0;
       this.strip = 0; // screen column
       this.tileX = 0; // where inside the wall that was hit, used for texture mapping
       this.distance = 0; // distance between player and wall
@@ -15,6 +32,18 @@ class RayHit {
       this.horizontal = false; // horizontal wall hit?
       this.wallType = 0; // type of wall
       this.rayAngle = 0; // angle of ray hitting the wall
+      this.sprite = null // save sprite hit
+    }
+
+    static spriteRayHit(sprite, distX, distY, strip, rayAngle)
+    {
+        let squaredDistance = distX*distX + distY*distY;
+        let rayHit = new RayHit()
+        rayHit.sprite = sprite
+        rayHit.strip = strip
+        rayHit.rayAngle = rayAngle
+        rayHit.distance = Math.sqrt(squaredDistance)
+        return rayHit
     }
 }
 
@@ -61,21 +90,64 @@ class Raycaster
   initPlayer()
   {
     this.player =  {
-      x : 16 * 128, // current x, y position in game units
-      y : 10 * 128,
+      x : 16 * this.tileSize, // current x, y position in game units
+      y : 10 * this.tileSize,
       z : 0,
       dir : 0,    // the direction that the player is turning, either -1 for left or 1 for right.
       rot : 0,    // the current angle of rotation. Counterclockwise is positive.
       speed : 0,    // is the playing moving forward (speed = 1) or backwards (speed = -1).
-      moveSpeed : (128/6),  // how far (in map units) does the player move each step/update
+      moveSpeed : (this.tileSize/6),  // how far (in map units) does the player move each step/update
       rotSpeed : 4 * Math.PI / 180  // how much does the player rotate each step/update (in radians)
     }
+  }
+
+  initSprites()
+  {
+    // Put sprite in center of cell
+    const tileSizeHalf = Math.floor(this.tileSize/2)
+    let spritePositions = [
+      [18*this.tileSize+tileSizeHalf, 8*this.tileSize+tileSizeHalf],
+      [18*this.tileSize+tileSizeHalf, 12*this.tileSize+tileSizeHalf],
+      [12*this.tileSize+tileSizeHalf, 8*this.tileSize+tileSizeHalf],
+    ]
+
+    let sprite = null
+    this.sprites = []
+
+    for (let pos of spritePositions) {
+      let sprite = new Sprite(pos[0], pos[1], 0, this.tileSize, this.tileSize)
+      console.log(JSON.stringify(sprite))
+      this.sprites.push(sprite)
+    }
+  }
+
+  resetSpriteHits()
+  {
+    for (let i=0; i<this.sprites.length; ++i) {
+      this.sprites[i].hit = false
+    }
+  }
+
+  findSpritesInCell(cellX, cellY, onlyNotHit=false)
+  {
+    let spritesFound = []
+    for (let i=0; i<this.sprites.length; ++i) {
+      let sprite = this.sprites[i]
+      if (onlyNotHit && sprite.hit) {
+        continue
+      }
+      let spriteCellX = Math.floor(sprite.x/this.tileSize)
+      let spriteCellY = Math.floor(sprite.y/this.tileSize)
+      if (cellX==spriteCellX && cellY==spriteCellY) {
+        spritesFound.push(sprite);
+      }
+    }
+    return spritesFound
   }
 
   constructor(mainCanvas, displayWidth=640, displayHeight=360, tileSize=128, textureSize=64, fovDegrees=90)
   {
     this.initMap()
-    this.initPlayer()
     this.stripWidth = 1 // leave this at 1 for now
     this.ceilingHeight = 1 // ceiling height in blocks
     this.mainCanvas = mainCanvas
@@ -100,6 +172,9 @@ class Raycaster
     this.textureImageDatas = []
     this.texturesLoadedCount = 0
     this.texturesLoaded = false
+
+    this.initPlayer()
+    this.initSprites()
   }
 
   /**
@@ -143,13 +218,13 @@ class Raycaster
 
   sharpenCanvas() {
     // Set display size (css pixels).
-    var sizew = this.displayWidth;
-    var sizeh = this.displayHeight;
+    let sizew = this.displayWidth;
+    let sizeh = this.displayHeight;
     this.mainCanvas.style.width = sizew + "px";
     this.mainCanvas.style.height = sizeh + "px";
 
     // Set actual size in memory (scaled to account for extra pixel density).
-    var scale = window.devicePixelRatio; // Change to 1 on retina screens to see blurry canvas.
+    let scale = window.devicePixelRatio; // Change to 1 on retina screens to see blurry canvas.
     this.mainCanvas.width = Math.floor(sizew * scale);
     this.mainCanvas.height = Math.floor(sizeh * scale);
 
@@ -160,7 +235,7 @@ class Raycaster
 
   initScreen() {
     this.mainCanvasContext = this.mainCanvas.getContext('2d');
-    var screen = document.getElementById("screen");
+    let screen = document.getElementById("screen");
     screen.style.width = this.displayWidth + "px";
     screen.style.height = this.displayHeight + "px";
     this.mainCanvas.width = this.displayWidth;
@@ -171,8 +246,10 @@ class Raycaster
   loadFloorCeilingImages() {
     // Draw images on this temporary canvas to grab the ImageData pixels
     let canvas = document.createElement('canvas');
-    canvas.width = 128
-    canvas.height = 256
+
+    // Canvas needs to be big enough for the wall texture
+    canvas.width = this.textureSize * 2
+    canvas.height = this.textureSize * 4
     let context = canvas.getContext('2d');
 
     // Save floor image pixels
@@ -190,6 +267,14 @@ class Raycaster
     context.drawImage(wallsImage, 0, 0, wallsImage.width, wallsImage.height);
     this.wallsImageData = context.getImageData(0, 0, wallsImage.width, wallsImage.height);
     console.log("wallsImage.width="+wallsImage.width);
+
+    // Save zombie image pixels
+    canvas = document.createElement('canvas');
+    context = canvas.getContext('2d');
+    let spriteImage = document.getElementById('sprite1');
+    context.drawImage(spriteImage, 0, 0, spriteImage.width, spriteImage.height);
+    this.spriteImageData = context.getImageData(0, 0, spriteImage.width, spriteImage.height);
+    console.log("spriteImage.width="+spriteImage.width);
   }
 
   // bind keyboard events to game functions (movement, etc)
@@ -232,7 +317,9 @@ class Raycaster
     this.move();
     this.updateMiniMap();
     let rayHits = [];
+    this.resetSpriteHits()
     this.castRays(rayHits);
+    this.sortRayHits(rayHits)
     this.drawWorld(rayHits);
     let this2 = this
     setTimeout(function() {
@@ -458,12 +545,18 @@ class Raycaster
     }
     for (let i=0; i<rayHits.length; ++i) {
       let rayHit = rayHits[ i ];
-      let wallScreenHeight = Math.round(this.viewDist / rayHit.correctDistance*this.tileSize);
-      let textureX = (rayHit.horizontal?this.textureSize-1:0) + (rayHit.tileX/this.tileSize*this.textureSize);
-      let textureY = this.textureSize * (rayHit.wallType-1);
-      this.drawWallStrip(rayHit, textureX, textureY, wallScreenHeight);
+      if (rayHit.sprite) {
+        this.drawSprite(rayHit.sprite)
+      }
+      else {
+        let wallScreenHeight = Math.round(this.viewDist / rayHit.correctDistance*this.tileSize);
+        let textureX = (rayHit.horizontal?this.textureSize-1:0) + (rayHit.tileX/this.tileSize*this.textureSize);
+        let textureY = this.textureSize * (rayHit.wallType-1);
+        this.drawWallStrip(rayHit, textureX, textureY, wallScreenHeight);
+      }
     }
     this.mainCanvasContext.putImageData(this.backBuffer, 0, 0);
+
   }
 
   /*
@@ -512,6 +605,13 @@ class Raycaster
     }
   }
 
+  sortRayHits(rayHits)
+  {
+    rayHits.sort(function(a,b){
+      return a.distance > b.distance ? -1 : 1
+    });
+  }
+
   castRays(rayHits)
   {
     for (let i=0; i<this.rayAngles.length; i++) {
@@ -524,25 +624,32 @@ class Raycaster
     rayAngle %= Raycaster.TWO_PI;
     if (rayAngle < 0) rayAngle += Raycaster.TWO_PI;
 
-    var right = (rayAngle<Raycaster.TWO_PI*0.25 && rayAngle>=0) || // Quadrant 1
+    //   2  |  1
+    //  ----+----
+    //   3  |  4
+    let right = (rayAngle<Raycaster.TWO_PI*0.25 && rayAngle>=0) || // Quadrant 1
                 (rayAngle>Raycaster.TWO_PI*0.75); // Quadrant 4
-    var up    = rayAngle<Raycaster.TWO_PI*0.5  && rayAngle>=0; // Quadrant 1 and 2
+    let up    = rayAngle<Raycaster.TWO_PI*0.5  && rayAngle>=0; // Quadrant 1 and 2
 
-    var wallType = 0;
-    var textureX; // the x-coord on the texture of the block, ie. what part of the texture are we going to render
 
-    var dist = 0; // the distance to the block we hit
-    var xHit = 0; // the x and y coord of where the ray hit the block
-    var yHit = 0;
+    let wallHit = new RayHit
 
-    var wallHorizontal = false;
+    // Check current cell for sprite
+    let cellX = Math.floor(this.player.x / this.tileSize);
+    let cellY = Math.floor(this.player.y / this.tileSize);
+    let spritesFound = this.findSpritesInCell(cellX, cellY, true)
+    for (let sprite of spritesFound) {
+      sprite.hit = true
+      rayHits.push(RayHit.spriteRayHit(sprite, this.player.x-sprite.x, this.player.y-sprite.y, stripIdx, rayAngle))
+    }
+
 
     //--------------------------
     // Vertical Lines Checking
     //--------------------------
 
     // Find x coordinate of vertical lines on the right and left
-    var vx = 0;
+    let vx = 0;
     if (right) {
       vx = Math.floor(this.player.x/this.tileSize) * this.tileSize + this.tileSize;
     }
@@ -552,11 +659,11 @@ class Raycaster
 
     // Calculate y coordinate of those lines
     // lineY = playerY + (playerX-lineX)*tan(ALPHA);
-    var vy = this.player.y + (this.player.x-vx)*Math.tan(rayAngle);
+    let vy = this.player.y + (this.player.x-vx)*Math.tan(rayAngle);
 
     // Calculate stepping vector for each line
-    var stepx = right ? this.tileSize : -this.tileSize;
-    var stepy = this.tileSize * Math.tan(rayAngle);
+    let stepx = right ? this.tileSize : -this.tileSize;
+    let stepy = this.tileSize * Math.tan(rayAngle);
 
     // tan() returns positive values in Quadrant 1 and Quadrant 4
     // But window coordinates need negative coordinates for Y-axis so we reverse them
@@ -565,25 +672,32 @@ class Raycaster
     }
 
     while (vx >= 0 && vx < this.mapWidth*this.tileSize && vy >= 0 && vy < this.mapHeight*this.tileSize) {
-      var wallY = Math.floor(vy / this.tileSize);
-      var wallX = Math.floor(vx / this.tileSize);
-      if (this.map[wallY][wallX] > 0) {
-        var distX = this.player.x - vx;
-        var distY = this.player.y - vy;
-        var blockDist = distX*distX + distY*distY;
-        if (!dist || blockDist < dist) {
-          dist = blockDist;
-          xHit = vx;
-          yHit = vy;
-          wallType = this.map[wallY][wallX];
-          textureX = vy % this.tileSize;
+      let cellY = Math.floor(vy / this.tileSize);
+      let cellX = Math.floor(vx / this.tileSize);
+      if (this.map[cellY][cellX] > 0) {
+        let distX = this.player.x - vx;
+        let distY = this.player.y - vy;
+        let squaredDistance = distX*distX + distY*distY;
+        if (!wallHit.distance || squaredDistance < wallHit.distance) {
+          wallHit.distance = squaredDistance;
+          wallHit.x = vx;
+          wallHit.y = vy;
+          wallHit.wallType = this.map[cellY][cellX];
+          wallHit.tileX = vy % this.tileSize;
 
           // Facing left, flip image
           if (!right) {
-            textureX = this.tileSize - textureX;
+            wallHit.tileX = this.tileSize - wallHit.tileX;
           }
         }
-        break;
+        break
+      }
+      else {
+        let spritesFound = this.findSpritesInCell(cellX, cellY, true)
+        for (let sprite of spritesFound) {
+          sprite.hit = true
+          rayHits.push(RayHit.spriteRayHit(sprite, this.player.x-sprite.x, this.player.y-sprite.y, stripIdx, rayAngle))
+        }
       }
       vx += stepx;
       vy += stepy;
@@ -594,7 +708,7 @@ class Raycaster
     //--------------------------
 
     // Find y coordinate of horizontal lines above and below
-    var hy = 0;
+    let hy = 0;
     if (up) {
       hy = Math.floor(this.player.y/this.tileSize) * this.tileSize - 1;
     }
@@ -604,70 +718,179 @@ class Raycaster
 
     // Calculation x coordinate of horizontal line
     // lineX = playerX + (playerY-lineY)/tan(ALPHA);
-    var hx = this.player.x + (this.player.y-hy) / Math.tan(rayAngle);
-    var stepy = up ? -this.tileSize : this.tileSize;
-    var stepx = this.tileSize / Math.tan(rayAngle);
+    let hx = this.player.x + (this.player.y-hy) / Math.tan(rayAngle);
+    stepy = up ? -this.tileSize : this.tileSize;
+    stepx = this.tileSize / Math.tan(rayAngle);
 
     // tan() returns stepx as positive in quadrant 3 and negative in quadrant 4
-    // This is the opposite of window coordinates so we need to reverse when angle is facing down
+    // This is the opposite of horizontal window coordinates so we need to reverse the values
+    // when angle is facing down
     if ( !up ) {
       stepx = -stepx;
     }
 
     while (hx >= 0 && hx < this.mapWidth*this.tileSize && hy >= 0 && hy < this.mapHeight*this.tileSize) {
-      var wallY = Math.floor(hy / this.tileSize);
-      var wallX = Math.floor(hx / this.tileSize);
-      if (this.map[wallY][wallX] > 0) {
-        var distX = this.player.x - hx;
-        var distY = this.player.y - hy;
-        var blockDist = distX*distX + distY*distY;
-        if (!dist || blockDist < dist) {
-          dist = blockDist;
-          xHit = hx;
-          yHit = hy;
-          wallType = this.map[wallY][wallX];
-          textureX = hx % this.tileSize;
-          wallHorizontal = true;
+      let cellY = Math.floor(hy / this.tileSize);
+      let cellX = Math.floor(hx / this.tileSize);
+      if (this.map[cellY][cellX] > 0) {
+        let distX = this.player.x - hx;
+        let distY = this.player.y - hy;
+        let squaredDistance = distX*distX + distY*distY;
+        if (!wallHit.distance || squaredDistance < wallHit.distance) {
+          wallHit.distance = squaredDistance
+          wallHit.x = hx;
+          wallHit.y = hy;
+          wallHit.wallType = this.map[cellY][cellX];
+          wallHit.tileX = hx % this.tileSize;
+          wallHit.horizontal = true;
 
           // Facing down, flip image
           if (!up) {
-            textureX = this.tileSize - textureX;
+            wallHit.tileX = this.tileSize - wallHit.tileX;
           }
         }
-        break;
+        break
+      }
+      else {
+        let spritesFound = this.findSpritesInCell(cellX, cellY, true)
+        for (let sprite of spritesFound) {
+          sprite.hit = true
+          rayHits.push(RayHit.spriteRayHit(sprite, this.player.x-sprite.x, this.player.y-sprite.y, stripIdx, rayAngle))
+        }
       }
       hx += stepx;
       hy += stepy;
     }
 
-
-    let rayHit = new RayHit();
-    rayHit.strip = stripIdx;
-    rayHit.tileX = textureX;
-    rayHit.horizontal = wallHorizontal;
-    rayHit.wallType = wallType;
-    rayHit.rayAngle = rayAngle;
-    if (dist) {
-      rayHit.distance = Math.sqrt(dist);
-      rayHit.correctDistance = rayHit.distance * Math.cos( this.player.rot - rayAngle );
-      this.drawRay(xHit, yHit);
+    if (wallHit.distance) {
+      wallHit.distance = Math.sqrt(wallHit.distance)
+      wallHit.correctDistance = wallHit.distance * Math.cos( this.player.rot - rayAngle );
+      wallHit.strip = stripIdx;
+      wallHit.rayAngle = rayAngle;
+      this.drawRay(wallHit.x, wallHit.y);
+      rayHits.push(wallHit);
     }
-    rayHits.push(rayHit);
+  }
+
+
+  drawTexturedRect(imgdata,srcX,srcY,srcW,srcH,dstX,dstY,dstW,dstH)
+  {
+    let startX = Math.floor(dstX)
+    let startY = Math.floor(dstY);
+    let endX   = Math.floor(dstX + dstW);
+    let endY   = Math.floor(dstY + dstH);
+    let textureX = Math.floor(srcX);
+    let screenX = startX
+    let screenY = startY;
+    let dx = endX - startX
+    let dy = endY - startY
+
+    // Nothing to draw
+    if (dx===0 || dy===0) {
+      return
+    }
+
+    // Skip top pixels off screen
+    if (screenY < 0) {
+      screenY = 0
+    }
+
+    for (; screenY<endY && screenY<this.displayHeight; screenY++) {
+      for(screenX=startX; screenX<endX && screenX<this.displayWidth; screenX++) {
+        if (screenX<0) {
+          screenX = 0
+          continue
+        }
+        let textureX = srcX + Math.floor( ((screenX-startX) / dstW) * srcW );
+        let textureY = srcY + Math.floor( ((screenY-startY) / dstH) * srcH );
+        let srcPixel = Raycaster.getPixel(imgdata, textureX, textureY);
+        if (srcPixel.a) {
+          Raycaster.setPixel(this.backBuffer, screenX, screenY, srcPixel.r, srcPixel.g, srcPixel.b, 255);
+        }
+      }
+    }
+  }
+
+  drawSprite(sprite)
+  {
+    let rc = this.spriteScreenPosition(sprite)
+    this.drawTexturedRect(this.spriteImageData, 0, 0, this.textureSize, this.textureSize, rc.x, rc.y, rc.w, rc.h);
+  }
+
+  /**
+  Algorithm adapted from this article:
+  https://dev.opera.com/articles/3d-games-with-canvas-and-raycasting-part-2/
+
+               S----------+                       ------
+                \         |                          ^
+                 \        |                          |
+                  \<--x-->|                     centerDistance
+   spriteDistance  \------+--view plane -----        |
+                    \     |               ^          |
+                     \    |               |          |
+                      \   |         viewDist         |
+                       \sa|               |          |
+                        \ |-----+         |          |
+                         \| rot |         v          v
+                          P-----+---------------------------
+
+     S  = the sprite      dx  = S.x - P.x      sa  = spriteAngle
+     P  = player          dy  = S.y - P.y      rot = player camera rotation
+
+    totalAngle = spriteAngle + rot
+    tan(spriteAngle) = x / viewDist
+    cos(spriteAngle) = centerDistance / spriteDistance
+  */
+  spriteScreenPosition(sprite)
+  {
+    let rc = {x:0, y:0, w:0, h:0}
+
+    // Calculate angle between player and sprite
+    // We use atan2() to find the sprite's angle if the player rotation was 0 degrees
+    // Then we deduct the player's current rotation from it
+    // Note that plus (+) is used to "deduct" instead of minus (-) because it takes
+    // into account these facts:
+    //   a) dx and dy use world coordinates, while atan2() uses cartesian coordinates.
+    //   b) atan2() can return positive or negative angles based on the circle quadrant
+    let dx = sprite.x - this.player.x
+    let dy = sprite.y - this.player.y
+    let totalAngle = Math.atan2(dy, dx)
+    let spriteAngle = totalAngle + this.player.rot
+
+    // x distance from center line
+    let x = Math.tan(spriteAngle) * this.viewDist;
+
+    let spriteDistance = Math.sqrt(dx*dx + dy*dy)
+    let centerDistance = Math.cos(spriteAngle)*spriteDistance;
+
+    // spriteScreenWidth   spriteWorldWidth
+    // ----------------- = ----------------
+    //      viewDist        centerDistance
+    let spriteScreenWidth = this.tileSize * this.viewDist / centerDistance
+    let spriteScreenHeight = spriteScreenWidth // assume both width and height are the same
+
+    rc.x = (this.displayWidth/2) + x // get distance from left of screen
+           - (spriteScreenWidth/2)   // deduct half of sprite width because x is center of sprite
+    rc.y = (this.displayHeight - spriteScreenWidth)/2.0
+    rc.w = spriteScreenWidth
+    rc.h = spriteScreenHeight
+
+    return rc
   }
 
   drawRay(rayX, rayY) {
-    var miniMapObjects = document.getElementById("minimapobjects");
-    var objectCtx = miniMapObjects.getContext("2d");
+    let miniMapObjects = document.getElementById("minimapobjects");
+    let objectCtx = miniMapObjects.getContext("2d");
 
     rayX = rayX / (this.mapWidth*this.tileSize) * 100;
     rayX = rayX/100 * Raycaster.MINIMAP_SCALE * this.mapWidth;
     rayY = rayY / (this.mapHeight*this.tileSize) * 100;
     rayY = rayY/100 * Raycaster.MINIMAP_SCALE * this.mapHeight;
 
-    var playerX = this.player.x / (this.mapWidth*this.tileSize) * 100;
+    let playerX = this.player.x / (this.mapWidth*this.tileSize) * 100;
     playerX = playerX/100 * Raycaster.MINIMAP_SCALE * this.mapWidth;
 
-    var playerY = this.player.y / (this.mapHeight*this.tileSize) * 100;
+    let playerY = this.player.y / (this.mapHeight*this.tileSize) * 100;
     playerY = playerY/100 * Raycaster.MINIMAP_SCALE * this.mapHeight;
 
     objectCtx.strokeStyle = "rgba(0,100,0,0.3)";
@@ -684,7 +907,7 @@ class Raycaster
 
   move() {
     // speed = forward / backward = 1 or -1
-    var moveStep = this.player.speed * this.player.moveSpeed; // player will move this far along the current direction vector
+    let moveStep = this.player.speed * this.player.moveSpeed; // player will move this far along the current direction vector
 
     // dir = left / right = -1 or 1
     this.player.rot += -this.player.dir * this.player.rotSpeed; // add rotation if player is rotating (this.player.dir != 0)
@@ -697,17 +920,17 @@ class Raycaster
      // x = H * cos(angle)
      // sin(angle) = O / H = y / H
      // y = H * sin(angle)
-    var newX = this.player.x + Math.cos(this.player.rot) * moveStep;  // calculate new player position with simple trigonometry
-    var newY = this.player.y + -Math.sin(this.player.rot) * moveStep;
+    let newX = this.player.x + Math.cos(this.player.rot) * moveStep;  // calculate new player position with simple trigonometry
+    let newY = this.player.y + -Math.sin(this.player.rot) * moveStep;
 
     // Round down to integers
     newX = Math.floor( newX );
     newY = Math.floor( newY );
 
-    var wallX = newX / this.tileSize;
-    var wallY = newY / this.tileSize;
+    let cellX = newX / this.tileSize;
+    let cellY = newY / this.tileSize;
 
-    if (this.isBlocking(wallX, wallY)) { // are we allowed to move to the new position?
+    if (this.isBlocking(cellX, cellY)) { // are we allowed to move to the new position?
       return; // no, bail out.
     }
 
@@ -727,17 +950,17 @@ class Raycaster
 
   updateMiniMap() {
 
-    var miniMap = document.getElementById("minimap");
-    var miniMapObjects = document.getElementById("minimapobjects");
+    let miniMap = document.getElementById("minimap");
+    let miniMapObjects = document.getElementById("minimapobjects");
 
-    var objectCtx = miniMapObjects.getContext("2d");
+    let objectCtx = miniMapObjects.getContext("2d");
 
     miniMapObjects.width = miniMapObjects.width;
 
-    var playerX = this.player.x / (this.mapWidth*this.tileSize) * 100;
+    let playerX = this.player.x / (this.mapWidth*this.tileSize) * 100;
     playerX = playerX/100 * Raycaster.MINIMAP_SCALE * this.mapWidth;
 
-    var playerY = this.player.y / (this.mapHeight*this.tileSize) * 100;
+    let playerY = this.player.y / (this.mapHeight*this.tileSize) * 100;
     playerY = playerY/100 * Raycaster.MINIMAP_SCALE * this.mapHeight;
 
     objectCtx.fillStyle = "red";
