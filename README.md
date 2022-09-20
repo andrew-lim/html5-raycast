@@ -1,6 +1,6 @@
 # HTML5 Raycast
 
-![](raycast3d.jpg)
+[![Click to try demo](raycast3d.jpg)](https://andrew-lim.github.io/html5-raycast/raycast3d.htm)
 
 A Wolfenstein 3D style JavaScript Raycaster using the browser's HTML5 Canvas for rendering.
 
