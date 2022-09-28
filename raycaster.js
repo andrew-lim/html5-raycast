@@ -29,7 +29,8 @@ class RayHit
       this.tileX = 0; // where inside the wall that was hit, used for texture mapping
       this.distance = 0; // distance between player and wall
       this.correctDistance = 0; // distance to correct for fishbowl effect
-      this.horizontal = false; // horizontal wall hit?
+      this.vertical = false; // vertical cell hit
+      this.horizontal = false; // horizontal cell hit
       this.wallType = 0; // type of wall
       this.rayAngle = 0; // angle of ray hitting the wall
       this.sprite = null // save sprite hit
@@ -45,6 +46,24 @@ class RayHit
         rayHit.distance = Math.sqrt(squaredDistance)
         return rayHit
     }
+}
+
+class RayState
+{
+  constructor(rayAngle, strip)
+  {
+    this.rayAngle = rayAngle
+    this.strip = strip
+    this.cellX = 0
+    this.cellY = 0
+    this.rayHits = []
+    this.vx = 0
+    this.vy = 0
+    this.hx = 0
+    this.hy = 0
+    this.vertical = false
+    this.horizontal = false
+  }
 }
 
 class Raycaster
@@ -123,8 +142,8 @@ class Raycaster
 
   resetSpriteHits()
   {
-    for (let i=0; i<this.sprites.length; ++i) {
-      this.sprites[i].hit = false
+    for (let sprite of this.sprites) {
+      sprite.hit = false
     }
   }
 
@@ -332,34 +351,86 @@ class Raycaster
     return Math.round(screenDistance/correctDistance*heightInGame);
   }
 
-  blit(imgdata,srcX,srcY,srcW,srcH,dstX,dstY,dstW,dstH)
+  drawTexturedRect(imgdata, srcX, srcY, srcW, srcH, dstX, dstY, dstW, dstH)
   {
-    let startY = Math.floor(dstY);
-    let endY   = Math.floor(dstY + dstH);
-    let textureX = Math.floor(srcX);
-    let screenY = startY;
-    let dy = endY - startY
+    srcX = Math.trunc(srcX)
+    srcY = Math.trunc(srcY)
+    dstX = Math.trunc(dstX)
+    dstY = Math.trunc(dstY);
+    const dstEndX = Math.trunc(dstX + dstW)
+    const dstEndY = Math.trunc(dstY + dstH)
+    const dx = dstEndX - dstX
+    const dy = dstEndY - dstY
 
     // Nothing to draw
-    if (dy === 0) {
+    if (dx===0 || dy===0) {
       return
     }
 
-    let texStepY = srcH / dy
-    let texY = srcY
+    // Linear interpolation variables
+    let screenStartX = dstX
+    let screenStartY = dstY
+    let texStartX = srcX
+    let texStartY = srcY
+    const texStepX = srcW / dx
+    const texStepY = srcH / dy
 
     // Skip top pixels off screen
-    if (screenY < 0) {
-      texY = srcY + (0-screenY) * texStepY
-      screenY = 0
+    if (screenStartY < 0) {
+      texStartY = srcY + (0-screenStartY) * texStepY
+      screenStartY = 0
     }
 
-    for (; screenY<endY && screenY<this.displayHeight; screenY++) {
-      let textureY = Math.trunc(texY)
-      // let textureY = srcY + Math.floor( ((screenY-startY) / dstH) * srcH );
-      let srcPixel = Raycaster.getPixel(imgdata, textureX, textureY);
-      Raycaster.setPixel(this.backBuffer, dstX, screenY, srcPixel.r, srcPixel.g, srcPixel.b, 255);
+    // Skip left pixels off screen
+    if (screenStartX < 0) {
+      texStartX = srcX + (0-screenStartX) * texStepX
+      screenStartX = 0
+    }
+
+    for (let texY=texStartY, screenY=screenStartY; screenY<dstEndY && screenY<this.displayHeight; screenY++) {
+      for(let texX=texStartX, screenX=screenStartX; screenX<dstEndX && screenX<this.displayWidth; screenX++) {
+        let textureX = Math.trunc(texX)
+        let textureY = Math.trunc(texY)
+
+        // Another way using multiplication
+        // let textureX = srcX + Math.trunc( ((screenX-dstX) / dstW) * srcW );
+        // let textureY = srcY + Math.trunc( ((screenY-dstY) / dstH) * srcH );
+
+        let srcPixel = Raycaster.getPixel(imgdata, textureX, textureY);
+        if (srcPixel.a) {
+          Raycaster.setPixel(this.backBuffer, screenX, screenY, srcPixel.r, srcPixel.g, srcPixel.b, 255);
+        }
+        texX += texStepX
+      }
       texY += texStepY
+    }
+  }
+
+  drawSprite(rayHit)
+  {
+    let rc = this.spriteScreenPosition(rayHit.sprite)
+    this.drawTexturedRect(this.spriteImageData, 0, 0, this.textureSize, this.textureSize, rc.x, rc.y, rc.w, rc.h);
+  }
+
+  // Experimental, not called for now
+  drawSpriteStrip(rayHit)
+  {
+    let sprite = rayHit.sprite
+    let rc = this.spriteScreenPosition(sprite)
+    // sprite first strip is ahead of current strip
+    if (rc.x > rayHit.strip) {
+      return
+    }
+    // sprite last strip is before current strip
+    if (rc.x + rc.w < rayHit.strip) {
+      return
+    }
+    let diffX = Math.trunc(rayHit.strip - rc.x)
+    let dstX = rc.x + diffX
+    let srcX = Math.trunc(diffX / rc.w * this.textureSize)
+    let srcW = 1
+    if (srcX >= 0 && srcX <this.textureSize) {
+      this.drawTexturedRect(this.spriteImageData, srcX, 0, srcW, this.textureSize, dstX, rc.y, this.stripWidth, rc.h);
     }
   }
 
@@ -371,9 +442,9 @@ class Raycaster
     let imgy = (this.displayHeight - wallScreenHeight)/2;
     let imgw = this.stripWidth;
     let imgh = wallScreenHeight;
-    this.blit(this.wallsImageData,textureX,textureY,swidth,sheight,imgx,imgy,imgw,imgh);
+    this.drawTexturedRect(this.wallsImageData,textureX,textureY,swidth,sheight,imgx,imgy,imgw,imgh);
     for (let level=1; level<this.ceilingHeight; ++level) {
-      this.blit(this.wallsImageData,textureX,textureY,swidth,sheight,imgx,imgy-level*wallScreenHeight,imgw,imgh);
+      this.drawTexturedRect(this.wallsImageData,textureX,textureY,swidth,sheight,imgx,imgy-level*wallScreenHeight,imgw,imgh);
     }
   }
 
@@ -546,7 +617,7 @@ class Raycaster
     for (let i=0; i<rayHits.length; ++i) {
       let rayHit = rayHits[ i ];
       if (rayHit.sprite) {
-        this.drawSprite(rayHit.sprite)
+        this.drawSprite(rayHit)
       }
       else {
         let wallScreenHeight = Math.round(this.viewDist / rayHit.correctDistance*this.tileSize);
@@ -620,148 +691,82 @@ class Raycaster
     }
   }
 
-  castSingleRay(rayHits, rayAngle, stripIdx) {
-    rayAngle %= Raycaster.TWO_PI;
-    if (rayAngle < 0) rayAngle += Raycaster.TWO_PI;
+  /**
+   * Called when a cell in the grid has been hit by the current ray
+   *
+   * If searching for vertical lines, return true to continue search for next vertical line,
+   * or false to stop searching for vertical lines
+   *
+   * If searching for horizontal lines, return true to continue search for next horizontal line
+   * or false to stop searching for horizontal lines
+   *
+   * @param ray Current RayState
+   * @return true to continue searching for next line, false otherwise
+   */
+  onCellHit(ray)
+  {
+    let vx=ray.vx, vy=ray.vy, hx=ray.hx, hy=ray.hy
+    let up=ray.up, right=ray.right
+    let cellX=ray.cellX, cellY=ray.cellY
+    let wallHit = ray.wallHit
+    let horizontal = ray.horizontal
+    let wallFound = false
+    let stripIdx = ray.strip
+    let rayAngle = ray.rayAngle
+    let rayHits = ray.rayHits
 
-    //   2  |  1
-    //  ----+----
-    //   3  |  4
-    let right = (rayAngle<Raycaster.TWO_PI*0.25 && rayAngle>=0) || // Quadrant 1
-                (rayAngle>Raycaster.TWO_PI*0.75); // Quadrant 4
-    let up    = rayAngle<Raycaster.TWO_PI*0.5  && rayAngle>=0; // Quadrant 1 and 2
-
-
-    let wallHit = new RayHit
-
-    // Check current cell for sprite
-    let cellX = Math.floor(this.player.x / this.tileSize);
-    let cellY = Math.floor(this.player.y / this.tileSize);
+    // Check for sprites in cell
     let spritesFound = this.findSpritesInCell(cellX, cellY, true)
     for (let sprite of spritesFound) {
-      sprite.hit = true
-      rayHits.push(RayHit.spriteRayHit(sprite, this.player.x-sprite.x, this.player.y-sprite.y, stripIdx, rayAngle))
-    }
-
-
-    //--------------------------
-    // Vertical Lines Checking
-    //--------------------------
-
-    // Find x coordinate of vertical lines on the right and left
-    let vx = 0;
-    if (right) {
-      vx = Math.floor(this.player.x/this.tileSize) * this.tileSize + this.tileSize;
-    }
-    else {
-      vx = Math.floor(this.player.x/this.tileSize) * this.tileSize - 1;
-    }
-
-    // Calculate y coordinate of those lines
-    // lineY = playerY + (playerX-lineX)*tan(ALPHA);
-    let vy = this.player.y + (this.player.x-vx)*Math.tan(rayAngle);
-
-    // Calculate stepping vector for each line
-    let stepx = right ? this.tileSize : -this.tileSize;
-    let stepy = this.tileSize * Math.tan(rayAngle);
-
-    // tan() returns positive values in Quadrant 1 and Quadrant 4
-    // But window coordinates need negative coordinates for Y-axis so we reverse them
-    if ( right ) {
-      stepy = -stepy;
-    }
-
-    while (vx >= 0 && vx < this.mapWidth*this.tileSize && vy >= 0 && vy < this.mapHeight*this.tileSize) {
-      let cellY = Math.floor(vy / this.tileSize);
-      let cellX = Math.floor(vx / this.tileSize);
-      if (this.map[cellY][cellX] > 0) {
-        let distX = this.player.x - vx;
-        let distY = this.player.y - vy;
-        let squaredDistance = distX*distX + distY*distY;
-        if (!wallHit.distance || squaredDistance < wallHit.distance) {
-          wallHit.distance = squaredDistance;
-          wallHit.x = vx;
-          wallHit.y = vy;
-          wallHit.wallType = this.map[cellY][cellX];
-          wallHit.tileX = vy % this.tileSize;
-
-          // Facing left, flip image
-          if (!right) {
-            wallHit.tileX = this.tileSize - wallHit.tileX;
-          }
-        }
-        break
+      let spriteHit = RayHit.spriteRayHit(sprite, this.player.x-sprite.x, this.player.y-sprite.y, stripIdx, rayAngle)
+      if (spriteHit.distance) {
+        sprite.hit = true
+        rayHits.push(spriteHit)
       }
-      else {
-        let spritesFound = this.findSpritesInCell(cellX, cellY, true)
-        for (let sprite of spritesFound) {
-          sprite.hit = true
-          rayHits.push(RayHit.spriteRayHit(sprite, this.player.x-sprite.x, this.player.y-sprite.y, stripIdx, rayAngle))
-        }
-      }
-      vx += stepx;
-      vy += stepy;
     }
 
-    //--------------------------
-    // Horizontal Lines Checking
-    //--------------------------
-
-    // Find y coordinate of horizontal lines above and below
-    let hy = 0;
-    if (up) {
-      hy = Math.floor(this.player.y/this.tileSize) * this.tileSize - 1;
-    }
-    else {
-      hy = Math.floor(this.player.y/this.tileSize) * this.tileSize + this.tileSize;
-    }
-
-    // Calculation x coordinate of horizontal line
-    // lineX = playerX + (playerY-lineY)/tan(ALPHA);
-    let hx = this.player.x + (this.player.y-hy) / Math.tan(rayAngle);
-    stepy = up ? -this.tileSize : this.tileSize;
-    stepx = this.tileSize / Math.tan(rayAngle);
-
-    // tan() returns stepx as positive in quadrant 3 and negative in quadrant 4
-    // This is the opposite of horizontal window coordinates so we need to reverse the values
-    // when angle is facing down
-    if ( !up ) {
-      stepx = -stepx;
-    }
-
-    while (hx >= 0 && hx < this.mapWidth*this.tileSize && hy >= 0 && hy < this.mapHeight*this.tileSize) {
-      let cellY = Math.floor(hy / this.tileSize);
-      let cellX = Math.floor(hx / this.tileSize);
-      if (this.map[cellY][cellX] > 0) {
-        let distX = this.player.x - hx;
-        let distY = this.player.y - hy;
-        let squaredDistance = distX*distX + distY*distY;
-        if (!wallHit.distance || squaredDistance < wallHit.distance) {
-          wallHit.distance = squaredDistance
+    // Handle cell walls
+    if (this.map[cellY][cellX] > 0) {
+      let distX = this.player.x - (horizontal?hx:vx);
+      let distY = this.player.y - (horizontal?hy:vy)
+      let squaredDistance = distX*distX + distY*distY;
+      if (!wallHit.distance || squaredDistance < wallHit.distance) {
+        wallFound = true
+        wallHit.distance = squaredDistance;
+        if (horizontal) {
           wallHit.x = hx;
           wallHit.y = hy;
-          wallHit.wallType = this.map[cellY][cellX];
           wallHit.tileX = hx % this.tileSize;
-          wallHit.horizontal = true;
-
           // Facing down, flip image
           if (!up) {
             wallHit.tileX = this.tileSize - wallHit.tileX;
           }
         }
-        break
-      }
-      else {
-        let spritesFound = this.findSpritesInCell(cellX, cellY, true)
-        for (let sprite of spritesFound) {
-          sprite.hit = true
-          rayHits.push(RayHit.spriteRayHit(sprite, this.player.x-sprite.x, this.player.y-sprite.y, stripIdx, rayAngle))
+        else {
+          wallHit.x = vx;
+          wallHit.y = vy;
+          wallHit.tileX = vy % this.tileSize;
+          // Facing left, flip image
+          if (!right) {
+            wallHit.tileX = this.tileSize - wallHit.tileX;
+          }
         }
+        wallHit.wallType = this.map[cellY][cellX];
       }
-      hx += stepx;
-      hy += stepy;
     }
+    return !wallFound
+  }
 
+  /**
+   * Called when the current ray has finished casting
+   * @param ray The ending RayState
+   */
+  onRayEnd(ray)
+  {
+    let rayAngle = ray.rayAngle
+    let rayHits  = ray.rayHits
+    let stripIdx = ray.strip
+    let wallHit  = ray.wallHit
     if (wallHit.distance) {
       wallHit.distance = Math.sqrt(wallHit.distance)
       wallHit.correctDistance = wallHit.distance * Math.cos( this.player.rot - rayAngle );
@@ -772,49 +777,91 @@ class Raycaster
     }
   }
 
-
-  drawTexturedRect(imgdata,srcX,srcY,srcW,srcH,dstX,dstY,dstW,dstH)
+  castSingleRay(rayHits, rayAngle, stripIdx)
   {
-    let startX = Math.floor(dstX)
-    let startY = Math.floor(dstY);
-    let endX   = Math.floor(dstX + dstW);
-    let endY   = Math.floor(dstY + dstH);
-    let textureX = Math.floor(srcX);
-    let screenX = startX
-    let screenY = startY;
-    let dx = endX - startX
-    let dy = endY - startY
+    rayAngle %= Raycaster.TWO_PI;
+    if (rayAngle < 0) rayAngle += Raycaster.TWO_PI;
 
-    // Nothing to draw
-    if (dx===0 || dy===0) {
-      return
+    //   2  |  1
+    //  ----+----
+    //   3  |  4
+    let right = (rayAngle<Raycaster.TWO_PI*0.25 && rayAngle>=0) || // Quadrant 1
+                (rayAngle>Raycaster.TWO_PI*0.75); // Quadrant 4
+    let up    = rayAngle<Raycaster.TWO_PI*0.5  && rayAngle>=0; // Quadrant 1 and 2
+
+    let ray = new RayState(rayAngle, stripIdx)
+    ray.rayHits = rayHits
+    ray.right = right
+    ray.up = up
+    ray.wallHit = new RayHit
+
+    // Process current player cell
+    ray.cellX = Math.floor(this.player.x / this.tileSize);
+    ray.cellY = Math.floor(this.player.y / this.tileSize);
+    this.onCellHit(ray)
+
+    // closest vertical line
+    ray.vx = right ? Math.floor(this.player.x/this.tileSize) * this.tileSize + this.tileSize
+                   : Math.floor(this.player.x/this.tileSize) * this.tileSize - 1
+    ray.vy = this.player.y + (this.player.x-ray.vx)*Math.tan(rayAngle)
+
+    // closest horizontal line
+    ray.hy = up ? Math.floor(this.player.y/this.tileSize) * this.tileSize - 1
+                : Math.floor(this.player.y/this.tileSize) * this.tileSize + this.tileSize
+    ray.hx = this.player.x + (this.player.y-ray.hy) / Math.tan(rayAngle)
+
+    // vector for next vertical line
+    let stepvx = right ? this.tileSize : -this.tileSize
+    let stepvy = this.tileSize * Math.tan(rayAngle)
+
+    // vector for next horizontal line
+    let stephy = up ? -this.tileSize : this.tileSize
+    let stephx = this.tileSize / Math.tan(rayAngle)
+
+    // tan() returns positive values in Quadrant 1 and Quadrant 4
+    // But window coordinates need negative coordinates for Y-axis so we reverse them
+    if (right) {
+      stepvy = -stepvy
     }
 
-    // Skip top pixels off screen
-    if (screenY < 0) {
-      screenY = 0
+    // tan() returns stepx as positive in quadrant 3 and negative in quadrant 4
+    // This is the opposite of horizontal window coordinates so we need to reverse the values
+    // when angle is facing down
+    if (!up) {
+      stephx = -stephx
     }
 
-    for (; screenY<endY && screenY<this.displayHeight; screenY++) {
-      for(screenX=startX; screenX<endX && screenX<this.displayWidth; screenX++) {
-        if (screenX<0) {
-          screenX = 0
-          continue
-        }
-        let textureX = srcX + Math.floor( ((screenX-startX) / dstW) * srcW );
-        let textureY = srcY + Math.floor( ((screenY-startY) / dstH) * srcH );
-        let srcPixel = Raycaster.getPixel(imgdata, textureX, textureY);
-        if (srcPixel.a) {
-          Raycaster.setPixel(this.backBuffer, screenX, screenY, srcPixel.r, srcPixel.g, srcPixel.b, 255);
-        }
+    // Vertical lines
+    ray.vertical = true
+    ray.horizontal = false
+    while (ray.vx>=0 && ray.vx<this.worldWidth && ray.vy>=0 && ray.vy<this.worldHeight) {
+      ray.cellX = Math.floor(ray.vx / this.tileSize)
+      ray.cellY = Math.floor(ray.vy / this.tileSize)
+      if (this.onCellHit(ray)) {
+        ray.vx += stepvx
+        ray.vy += stepvy
+      }
+      else {
+        break
       }
     }
-  }
 
-  drawSprite(sprite)
-  {
-    let rc = this.spriteScreenPosition(sprite)
-    this.drawTexturedRect(this.spriteImageData, 0, 0, this.textureSize, this.textureSize, rc.x, rc.y, rc.w, rc.h);
+    // Horizontal lines
+    ray.vertical = false
+    ray.horizontal = true
+    while (ray.hx>=0 && ray.hx<this.worldWidth && ray.hy>=0 && ray.hy<this.worldHeight) {
+      ray.cellX = Math.floor(ray.hx / this.tileSize)
+      ray.cellY = Math.floor(ray.hy / this.tileSize)
+      if (this.onCellHit(ray)) {
+        ray.hx += stephx
+        ray.hy += stephy
+      }
+      else {
+        break
+      }
+    }
+
+    this.onRayEnd(ray)
   }
 
   /**
