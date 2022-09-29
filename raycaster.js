@@ -152,8 +152,7 @@ class Raycaster
   findSpritesInCell(cellX, cellY, onlyNotHit=false)
   {
     let spritesFound = []
-    for (let i=0; i<this.sprites.length; ++i) {
-      let sprite = this.sprites[i]
+    for (let sprite of this.sprites) {
       if (onlyNotHit && sprite.hit) {
         continue
       }
@@ -539,8 +538,7 @@ class Raycaster
   */
   drawTexturedFloor(rayHits)
   {
-    for (let i=0; i<rayHits.length; ++i) {
-      const rayHit = rayHits[ i ];
+    for (let rayHit of rayHits) {
       const wallScreenHeight = this.stripScreenHeight(this.viewDist, rayHit.correctDistance, this.tileSize);
       const centerY = this.displayHeight / 2;
       const eyeHeight = this.tileSize/2 + this.player.z;
@@ -571,8 +569,7 @@ class Raycaster
 
   drawTexturedCeiling(rayHits)
   {
-    for (let i=0; i<rayHits.length; ++i) {
-      const rayHit = rayHits[ i ];
+    for (let rayHit of rayHits) {
       const wallScreenHeight = this.stripScreenHeight(this.viewDist, rayHit.correctDistance, this.tileSize);
       const centerY = this.displayHeight / 2;
       const eyeHeight = this.tileSize/2 + this.player.z;
@@ -620,8 +617,7 @@ class Raycaster
     } else {
       this.drawSolidCeiling()
     }
-    for (let i=0; i<rayHits.length; ++i) {
-      let rayHit = rayHits[ i ];
+    for (let rayHit of rayHits) {
       if (rayHit.sprite) {
         this.drawSpriteStrip(rayHit)
       }
