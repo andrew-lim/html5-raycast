@@ -15,6 +15,7 @@ class Sprite
     this.w = w
     this.h = h
     this.hit = false
+    this.screenPosition = null // calculated screen position
   }
 }
 
@@ -144,6 +145,7 @@ class Raycaster
   {
     for (let sprite of this.sprites) {
       sprite.hit = false
+      sprite.screenPosition = null
     }
   }
 
@@ -387,8 +389,8 @@ class Raycaster
       screenStartX = 0
     }
 
-    for (let texY=texStartY, screenY=screenStartY; screenY<dstEndY && screenY<this.displayHeight; screenY++) {
-      for(let texX=texStartX, screenX=screenStartX; screenX<dstEndX && screenX<this.displayWidth; screenX++) {
+    for (let texY=texStartY, screenY=screenStartY; screenY<dstEndY && screenY<this.displayHeight; screenY++, texY+=texStepY) {
+      for(let texX=texStartX, screenX=screenStartX; screenX<dstEndX && screenX<this.displayWidth; screenX++, texX+=texStepX) {
         let textureX = Math.trunc(texX)
         let textureY = Math.trunc(texY)
 
@@ -400,23 +402,27 @@ class Raycaster
         if (srcPixel.a) {
           Raycaster.setPixel(this.backBuffer, screenX, screenY, srcPixel.r, srcPixel.g, srcPixel.b, 255);
         }
-        texX += texStepX
       }
-      texY += texStepY
     }
   }
 
-  drawSprite(rayHit)
-  {
-    let rc = this.spriteScreenPosition(rayHit.sprite)
-    this.drawTexturedRect(this.spriteImageData, 0, 0, this.textureSize, this.textureSize, rc.x, rc.y, rc.w, rc.h);
-  }
+  // Draws the entire sprite
+  // drawSprite(rayHit)
+  // {
+  //   let rc = this.spriteScreenPosition(rayHit.sprite)
+  //   this.drawTexturedRect(this.spriteImageData, 0, 0, this.textureSize, this.textureSize, rc.x, rc.y, rc.w, rc.h)
+  // }
 
-  // Experimental, not called for now
+  /**
+   * Draws only the vertical part of the sprite corresponding to the current screen strip
+   */
   drawSpriteStrip(rayHit)
   {
     let sprite = rayHit.sprite
-    let rc = this.spriteScreenPosition(sprite)
+    if (!rayHit.sprite.screenPosition) {
+      rayHit.sprite.screenPosition = this.spriteScreenPosition(rayHit.sprite)
+    }
+    let rc = rayHit.sprite.screenPosition
     // sprite first strip is ahead of current strip
     if (rc.x > rayHit.strip) {
       return
@@ -426,7 +432,7 @@ class Raycaster
       return
     }
     let diffX = Math.trunc(rayHit.strip - rc.x)
-    let dstX = rc.x + diffX
+    let dstX = rc.x + diffX // skip left parts of sprite already drawn
     let srcX = Math.trunc(diffX / rc.w * this.textureSize)
     let srcW = 1
     if (srcX >= 0 && srcX <this.textureSize) {
@@ -617,7 +623,7 @@ class Raycaster
     for (let i=0; i<rayHits.length; ++i) {
       let rayHit = rayHits[ i ];
       if (rayHit.sprite) {
-        this.drawSprite(rayHit)
+        this.drawSpriteStrip(rayHit)
       }
       else {
         let wallScreenHeight = Math.round(this.viewDist / rayHit.correctDistance*this.tileSize);
@@ -720,7 +726,7 @@ class Raycaster
     for (let sprite of spritesFound) {
       let spriteHit = RayHit.spriteRayHit(sprite, this.player.x-sprite.x, this.player.y-sprite.y, stripIdx, rayAngle)
       if (spriteHit.distance) {
-        sprite.hit = true
+        // sprite.hit = true
         rayHits.push(spriteHit)
       }
     }
@@ -733,9 +739,10 @@ class Raycaster
       if (!wallHit.distance || squaredDistance < wallHit.distance) {
         wallFound = true
         wallHit.distance = squaredDistance;
+        wallHit.horizontal = horizontal
         if (horizontal) {
-          wallHit.x = hx;
-          wallHit.y = hy;
+          wallHit.x = hx
+          wallHit.y = hy
           wallHit.tileX = hx % this.tileSize;
           // Facing down, flip image
           if (!up) {
@@ -743,8 +750,8 @@ class Raycaster
           }
         }
         else {
-          wallHit.x = vx;
-          wallHit.y = vy;
+          wallHit.x = vx
+          wallHit.y = vy
           wallHit.tileX = vy % this.tileSize;
           // Facing left, flip image
           if (!right) {
