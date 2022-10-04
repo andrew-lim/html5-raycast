@@ -5,6 +5,9 @@ https://github.com/andrew-lim/html5-raycast
 ---------------------------------------------**/
 'use strict';
 
+const DESIRED_FPS = 120;
+const UPDATE_INTERVAL = Math.trunc(1000/DESIRED_FPS)
+
 class Sprite
 {
   constructor(x=0, y=0, z=0, w=128, h=128)
@@ -116,8 +119,8 @@ class Raycaster
       dir : 0,    // the direction that the player is turning, either -1 for left or 1 for right.
       rot : 0,    // the current angle of rotation. Counterclockwise is positive.
       speed : 0,    // is the playing moving forward (speed = 1) or backwards (speed = -1).
-      moveSpeed : (this.tileSize/6),  // how far (in map units) does the player move each step/update
-      rotSpeed : 4 * Math.PI / 180  // how much does the player rotate each step/update (in radians)
+      moveSpeed : Math.round(this.tileSize/(DESIRED_FPS/60.0*16)),  // how far (in map units) does the player move each step/update
+      rotSpeed : 1.5 * Math.PI / 180  // how much does the player rotate each step/update (in radians)
     }
   }
 
@@ -226,6 +229,7 @@ class Raycaster
     this.drawMiniMap()
     this.createRayAngles()
     this.createViewDistances()
+    this.past = Date.now()
     this.gameCycle()
   }
 
@@ -334,7 +338,10 @@ class Raycaster
   }
 
   gameCycle() {
-    this.move();
+    let now = Date.now()
+    let timeElapsed = now - this.past
+    this.past = now
+    this.move(timeElapsed);
     this.updateMiniMap();
     let rayHits = [];
     this.resetSpriteHits()
@@ -342,9 +349,12 @@ class Raycaster
     this.sortRayHits(rayHits)
     this.drawWorld(rayHits);
     let this2 = this
-    setTimeout(function() {
+    window.requestAnimationFrame(function(){
       this2.gameCycle()
-    },1000/60);
+    });
+    // setTimeout(function() {
+    //   this2.gameCycle()
+    // },1000/60);
   }
 
   stripScreenHeight(screenDistance, correctDistance, heightInGame)
@@ -955,12 +965,15 @@ class Raycaster
     objectCtx.stroke();
   }
 
-  move() {
+  move(timeElapsed)
+  {
+    let timeBasedFactor = timeElapsed / UPDATE_INTERVAL;
+
     // speed = forward / backward = 1 or -1
-    let moveStep = this.player.speed * this.player.moveSpeed; // player will move this far along the current direction vector
+    let moveStep = this.player.speed * this.player.moveSpeed * timeBasedFactor; // player will move this far along the current direction vector
 
     // dir = left / right = -1 or 1
-    this.player.rot += -this.player.dir * this.player.rotSpeed; // add rotation if player is rotating (this.player.dir != 0)
+    this.player.rot += -this.player.dir * this.player.rotSpeed * timeBasedFactor; // add rotation if player is rotating (this.player.dir != 0)
 
     // make sure the angle is between 0 and 360 degrees
     // while (this.player.rot < 0) this.player.rot += Raycaster.TWO_PI;
