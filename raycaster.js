@@ -633,7 +633,7 @@ class Raycaster
       }
       else {
         let wallScreenHeight = Math.round(this.viewDist / rayHit.correctDistance*this.tileSize);
-        let textureX = (rayHit.horizontal?this.textureSize-1:0) + (rayHit.tileX/this.tileSize*this.textureSize);
+        let textureX = (rayHit.horizontal?this.textureSize:0) + (rayHit.tileX/this.tileSize*this.textureSize);
         let textureY = this.textureSize * (rayHit.wallType-1);
         this.drawWallStrip(rayHit, textureX, textureY, wallScreenHeight);
       }
