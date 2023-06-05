@@ -7,6 +7,14 @@ https://github.com/andrew-lim/html5-raycast
 
 const DESIRED_FPS = 120;
 const UPDATE_INTERVAL = Math.trunc(1000/DESIRED_FPS)
+const KEY_UP    = 38
+const KEY_DOWN  = 40
+const KEY_LEFT  = 37
+const KEY_RIGHT = 39
+const KEY_W = 87
+const KEY_S = 83
+const KEY_A = 65
+const KEY_D = 68
 
 class Sprite
 {
@@ -30,7 +38,7 @@ class RayHit
       this.x = 0; // world coordinates of hit
       this.y = 0;
       this.strip = 0; // screen column
-      this.tileX = 0; // where inside the wall that was hit, used for texture mapping
+      this.tileX = 0; // // wall hit position, used for texture mapping
       this.distance = 0; // distance between player and wall
       this.correctDistance = 0; // distance to correct for fishbowl effect
       this.vertical = false; // vertical cell hit
@@ -116,11 +124,11 @@ class Raycaster
       x : 16 * this.tileSize, // current x, y position in game units
       y : 10 * this.tileSize,
       z : 0,
-      dir : 0,    // the direction that the player is turning, either -1 for left or 1 for right.
-      rot : 0,    // the current angle of rotation. Counterclockwise is positive.
-      speed : 0,    // is the playing moving forward (speed = 1) or backwards (speed = -1).
-      moveSpeed : Math.round(this.tileSize/(DESIRED_FPS/60.0*16)),  // how far (in map units) does the player move each step/update
-      rotSpeed : 1.5 * Math.PI / 180  // how much does the player rotate each step/update (in radians)
+      dir : 0,   // turn direction,  -1 for left or 1 for right.
+      rot : 0,   // rotation angle; counterclockwise is positive.
+      speed : 0, // forward (speed = 1) or backwards (speed = -1).
+      moveSpeed : Math.round(this.tileSize/(DESIRED_FPS/60.0*16)),
+      rotSpeed : 1.5 * Math.PI / 180
     }
   }
 
@@ -168,7 +176,7 @@ class Raycaster
     return spritesFound
   }
 
-  constructor(mainCanvas, displayWidth=640, displayHeight=360, tileSize=128, textureSize=64, fovDegrees=90)
+  constructor(mainCanvas, displayWidth=640, displayHeight=360, tileSize=1280, textureSize=64, fovDegrees=90)
   {
     this.initMap()
     this.stripWidth = 1 // leave this at 1 for now
@@ -198,6 +206,12 @@ class Raycaster
 
     this.initPlayer()
     this.initSprites()
+    this.bindKeys()
+    this.initScreen()
+    this.drawMiniMap()
+    this.createRayAngles()
+    this.createViewDistances()
+    this.past = Date.now()
   }
 
   /**
@@ -221,16 +235,6 @@ class Raycaster
       b : imageData.data[index+2],
       a : imageData.data[index+3]
     };
-}
-
-  init() {
-    this.bindKeys()
-    this.initScreen()
-    this.drawMiniMap()
-    this.createRayAngles()
-    this.createViewDistances()
-    this.past = Date.now()
-    this.gameCycle()
   }
 
   /*
@@ -303,42 +307,20 @@ class Raycaster
 
   // bind keyboard events to game functions (movement, etc)
   bindKeys() {
+    this.keysDown = [];
     let this2 = this
     document.onkeydown = function(e) {
       e = e || window.event;
-      switch (e.keyCode) { // which key was pressed?
-        case 38: // up, move player forward, ie. increase speed
-          this2.player.speed = 1;
-          break;
-        case 40: // down, move player backward, set negative speed
-          this2.player.speed = -1;
-          break;
-        case 37: // left, rotate player left
-          this2.player.dir = -1;
-          break;
-        case 39: // right, rotate player right
-          this2.player.dir = 1;
-          break;
-      }
+      this2.keysDown[e.keyCode] = true;
     }
-
     document.onkeyup = function(e) {
       e = e || window.event;
-      switch (e.keyCode) {
-        case 38:
-        case 40:
-          this2.player.speed = 0; // stop the player movement when up/down key is released
-          break;
-        case 37:
-        case 39:
-          this2.player.dir = 0;
-          break;
-      }
+      this2.keysDown[e.keyCode] = false;
     }
   }
 
   gameCycle() {
-    let now = Date.now()
+    const now = Date.now()
     let timeElapsed = now - this.past
     this.past = now
     this.move(timeElapsed);
@@ -809,18 +791,18 @@ class Raycaster
     ray.wallHit = new RayHit
 
     // Process current player cell
-    ray.cellX = Math.floor(this.player.x / this.tileSize);
-    ray.cellY = Math.floor(this.player.y / this.tileSize);
+    ray.cellX = Math.trunc(this.player.x / this.tileSize);
+    ray.cellY = Math.trunc(this.player.y / this.tileSize);
     this.onCellHit(ray)
 
     // closest vertical line
-    ray.vx = right ? Math.floor(this.player.x/this.tileSize) * this.tileSize + this.tileSize
-                   : Math.floor(this.player.x/this.tileSize) * this.tileSize - 1
+    ray.vx = right ? Math.trunc(this.player.x/this.tileSize) * this.tileSize + this.tileSize
+                   : Math.trunc(this.player.x/this.tileSize) * this.tileSize - 1
     ray.vy = this.player.y + (this.player.x-ray.vx)*Math.tan(rayAngle)
 
     // closest horizontal line
-    ray.hy = up ? Math.floor(this.player.y/this.tileSize) * this.tileSize - 1
-                : Math.floor(this.player.y/this.tileSize) * this.tileSize + this.tileSize
+    ray.hy = up ? Math.trunc(this.player.y/this.tileSize) * this.tileSize - 1
+                : Math.trunc(this.player.y/this.tileSize) * this.tileSize + this.tileSize
     ray.hx = this.player.x + (this.player.y-ray.hy) / Math.tan(rayAngle)
 
     // vector for next vertical line
@@ -848,8 +830,8 @@ class Raycaster
     ray.vertical = true
     ray.horizontal = false
     while (ray.vx>=0 && ray.vx<this.worldWidth && ray.vy>=0 && ray.vy<this.worldHeight) {
-      ray.cellX = Math.floor(ray.vx / this.tileSize)
-      ray.cellY = Math.floor(ray.vy / this.tileSize)
+      ray.cellX = Math.trunc(ray.vx / this.tileSize)
+      ray.cellY = Math.trunc(ray.vy / this.tileSize)
       if (this.onCellHit(ray)) {
         ray.vx += stepvx
         ray.vy += stepvy
@@ -863,8 +845,8 @@ class Raycaster
     ray.vertical = false
     ray.horizontal = true
     while (ray.hx>=0 && ray.hx<this.worldWidth && ray.hy>=0 && ray.hy<this.worldHeight) {
-      ray.cellX = Math.floor(ray.hx / this.tileSize)
-      ray.cellY = Math.floor(ray.hy / this.tileSize)
+      ray.cellX = Math.trunc(ray.hx / this.tileSize)
+      ray.cellY = Math.trunc(ray.hy / this.tileSize)
       if (this.onCellHit(ray)) {
         ray.hx += stephx
         ray.hy += stephy
@@ -967,13 +949,34 @@ class Raycaster
 
   move(timeElapsed)
   {
+    const up    = this.keysDown[KEY_UP] || this.keysDown[KEY_W]
+    const down  = this.keysDown[KEY_DOWN] || this.keysDown[KEY_S]
+    const left  = this.keysDown[KEY_LEFT] || this.keysDown[KEY_A]
+    const right = this.keysDown[KEY_RIGHT] || this.keysDown[KEY_D]
+    this.player.speed = 0
+    this.player.dir = 0
+    if (up) {
+      this.player.speed = 1
+    }
+    else if (down) {
+      this.player.speed = -1
+    }
+    if (left) {
+      this.player.dir = -1
+    }
+    else if (right) {
+      this.player.dir = 1
+    }
+
     let timeBasedFactor = timeElapsed / UPDATE_INTERVAL;
 
     // speed = forward / backward = 1 or -1
-    let moveStep = this.player.speed * this.player.moveSpeed * timeBasedFactor; // player will move this far along the current direction vector
+    // player will move this far along the current direction vector
+    let moveStep = this.player.speed * this.player.moveSpeed * timeBasedFactor
 
     // dir = left / right = -1 or 1
-    this.player.rot += -this.player.dir * this.player.rotSpeed * timeBasedFactor; // add rotation if player is rotating (this.player.dir != 0)
+    // add rotation if player is rotating (this.player.dir != 0)
+    this.player.rot += -this.player.dir * this.player.rotSpeed * timeBasedFactor
 
     // make sure the angle is between 0 and 360 degrees
     // while (this.player.rot < 0) this.player.rot += Raycaster.TWO_PI;
@@ -983,8 +986,8 @@ class Raycaster
      // x = H * cos(angle)
      // sin(angle) = O / H = y / H
      // y = H * sin(angle)
-    let newX = this.player.x + Math.cos(this.player.rot) * moveStep;  // calculate new player position with simple trigonometry
-    let newY = this.player.y + -Math.sin(this.player.rot) * moveStep;
+    let newX = this.player.x + Math.cos(this.player.rot) * moveStep
+    let newY = this.player.y + -Math.sin(this.player.rot) * moveStep
 
     // Round down to integers
     newX = Math.floor( newX );
