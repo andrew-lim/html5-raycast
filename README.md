@@ -1,6 +1,6 @@
 # HTML5 Raycast
 
-[![Click to try demo](raycast3d.png)](https://andrew-lim.github.io/html5-raycast/raycast3d.htm)
+<a href="https://andrew-lim.github.io/html5-raycast/raycast3d.htm"><img src="raycast3d.png" size="50%"/></a>
 
 A Wolfenstein 3D style JavaScript Raycaster using the browser's HTML5 Canvas for rendering.
 
@@ -21,6 +21,7 @@ Main Differences from original article:
 ## Building
 
 There is no build step but you will need a HTTP webserver like [nginx](https://nginx.org/) to run and test locally.
+If you try to load the .htm file directly with a browser you'll like encounter an error like "The canvas has been tainted by cross-origin data."
 
 ## Other links
 - [F. Permadi's Raycasting Tutorial](https://permadi.com/1996/05/ray-casting-tutorial-7/). The raycast math used in this demo is closely based on this tutorial.
