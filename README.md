@@ -1,6 +1,8 @@
 # HTML5 Raycast
 
-<a href="https://andrew-lim.github.io/html5-raycast/raycast3d.htm"><img src="raycast3d.png" size="50%"/></a>
+<div style="max-width:50%">
+<a href="https://andrew-lim.github.io/html5-raycast/raycast3d.htm"><img src="raycast3d.png"/></a>
+</div>
 
 A Wolfenstein 3D style JavaScript Raycaster using the browser's HTML5 Canvas for rendering.
 
