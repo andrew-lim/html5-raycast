@@ -1,8 +1,8 @@
-/**--------------------------------------------
-JavaScript Canvas Wolfenstein 3D Raycaster
+/**----------------------------------------------
+JavaScript Canvas Wolfenstein-Style Raycaster
 Author: Andrew Lim
 https://github.com/andrew-lim/html5-raycast
----------------------------------------------**/
+-----------------------------------------------**/
 'use strict';
 
 const DESIRED_FPS = 120;
@@ -118,6 +118,47 @@ class Raycaster
     ];
   }
 
+  loadImages()
+  {
+    console.log("loadImages()")
+    this.textureImageDatas = []
+    this.texturesLoadedCount = 0
+    this.texturesLoaded = false
+
+    this.imageconf = [
+      {"id" : "floorImageData","src" : "img/grass.png"},
+      {"id" : "ceilingImageData", "src" : "img/water.png"},
+      {"id" : "spriteImageData", "src" : "img/zombie.png"},
+      {"id" : "wallsImageData", "src" : "img/wallsheet.png"}
+    ];
+
+    let div_textures = document.getElementById("div_textures")
+    let this2 = this
+    for (let imageconf of this.imageconf) {
+      let src = imageconf.src;
+      let img = document.createElement("img")
+      img.onload = function() {
+        console.log("img src loaded " + img.src)
+
+        // Draw images on this temporary canvas to grab the ImageData pixels
+        let canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        let context = canvas.getContext('2d')
+        context.drawImage(img, 0, 0, img.width, img.height)
+        console.log(imageconf.id + " size = (" + img.width + ", " + img.height + ")")
+
+        // Assign ImageData to a variable with same name as imageconf.id
+        this2[imageconf.id] = context.getImageData(0, 0, img.width, img.height)
+
+        this2.texturesLoadedCount++
+        this2.texturesLoaded = this2.texturesLoadedCount == this2.imageconf.length
+      };
+      div_textures.appendChild(img)
+      img.src = src
+    }
+  }
+
   initPlayer()
   {
     this.player =  {
@@ -138,6 +179,7 @@ class Raycaster
     const tileSizeHalf = Math.floor(this.tileSize/2)
     let spritePositions = [
       [18*this.tileSize+tileSizeHalf, 8*this.tileSize+tileSizeHalf],
+      [19*this.tileSize+tileSizeHalf, 8*this.tileSize+tileSizeHalf],
       [18*this.tileSize+tileSizeHalf, 12*this.tileSize+tileSizeHalf],
       [12*this.tileSize+tileSizeHalf, 8*this.tileSize+tileSizeHalf],
     ]
@@ -176,7 +218,7 @@ class Raycaster
     return spritesFound
   }
 
-  constructor(mainCanvas, displayWidth=640, displayHeight=360, tileSize=1280, textureSize=64, fovDegrees=90)
+  constructor(mainCanvas, displayWidth=640, displayHeight=360, tileSize=1280, textureSize=128, fovDegrees=90)
   {
     this.initMap()
     this.stripWidth = 1 // leave this at 1 for now
@@ -212,6 +254,8 @@ class Raycaster
     this.createRayAngles()
     this.createViewDistances()
     this.past = Date.now()
+
+    this.loadImages()
   }
 
   /**
@@ -268,41 +312,6 @@ class Raycaster
     screen.style.height = this.displayHeight + "px";
     this.mainCanvas.width = this.displayWidth;
     this.mainCanvas.height = this.displayHeight;
-    this.loadFloorCeilingImages();
-  }
-
-  loadFloorCeilingImages() {
-    // Draw images on this temporary canvas to grab the ImageData pixels
-    let canvas = document.createElement('canvas');
-
-    // Canvas needs to be big enough for the wall texture
-    canvas.width = this.textureSize * 2
-    canvas.height = this.textureSize * 4
-    let context = canvas.getContext('2d');
-
-    // Save floor image pixels
-    let floorimg = document.getElementById('floorimg');
-    context.drawImage(floorimg, 0, 0, floorimg.width, floorimg.height);
-    this.floorImageData = context.getImageData(0, 0, this.textureSize, this.textureSize);
-
-    // Save ceiling image pixels
-    let ceilingimg = document.getElementById('ceilingimg');
-    context.drawImage(ceilingimg, 0, 0, ceilingimg.width, ceilingimg.height);
-    this.ceilingImageData = context.getImageData(0, 0, this.textureSize, this.textureSize);
-
-    // Save walls image pixels
-    let wallsImage = document.getElementById('wallsImage');
-    context.drawImage(wallsImage, 0, 0, wallsImage.width, wallsImage.height);
-    this.wallsImageData = context.getImageData(0, 0, wallsImage.width, wallsImage.height);
-    console.log("wallsImage.width="+wallsImage.width);
-
-    // Save zombie image pixels
-    canvas = document.createElement('canvas');
-    context = canvas.getContext('2d');
-    let spriteImage = document.getElementById('sprite1');
-    context.drawImage(spriteImage, 0, 0, spriteImage.width, spriteImage.height);
-    this.spriteImageData = context.getImageData(0, 0, spriteImage.width, spriteImage.height);
-    console.log("spriteImage.width="+spriteImage.width);
   }
 
   // bind keyboard events to game functions (movement, etc)
@@ -320,16 +329,18 @@ class Raycaster
   }
 
   gameCycle() {
-    const now = Date.now()
-    let timeElapsed = now - this.past
-    this.past = now
-    this.move(timeElapsed);
-    this.updateMiniMap();
-    let rayHits = [];
-    this.resetSpriteHits()
-    this.castRays(rayHits);
-    this.sortRayHits(rayHits)
-    this.drawWorld(rayHits);
+    if (this.texturesLoaded) {
+      const now = Date.now()
+      let timeElapsed = now - this.past
+      this.past = now
+      this.move(timeElapsed);
+      this.updateMiniMap();
+      let rayHits = [];
+      this.resetSpriteHits()
+      this.castRays(rayHits);
+      this.sortRayHits(rayHits)
+      this.drawWorld(rayHits);
+    }
     let this2 = this
     window.requestAnimationFrame(function(){
       this2.gameCycle()
@@ -449,7 +460,7 @@ class Raycaster
   {
     for (let y=this.displayHeight/2; y<this.displayHeight; ++y) {
       for (let x=0; x<this.displayWidth; ++x) {
-        Raycaster.setPixel(this.backBuffer, x, y, 113, 113, 113, 255);
+        Raycaster.setPixel(this.backBuffer, x, y, 55, 180, 55, 255);
       }
     }
   }
@@ -458,7 +469,7 @@ class Raycaster
   {
     for (let y=0; y<this.displayHeight/2; ++y) {
       for (let x=0; x<this.displayWidth; ++x) {
-        Raycaster.setPixel(this.backBuffer, x, y, 56, 56, 56, 255);
+        Raycaster.setPixel(this.backBuffer, x, y, 64, 145, 250, 255);
       }
     }
   }
@@ -1005,10 +1016,10 @@ class Raycaster
   }
 
   isBlocking(x,y) {
-
     // first make sure that we cannot move outside the boundaries of the level
     if (y < 0 || y >= this.mapHeight || x < 0 || x >= this.mapWidth)
       return true;
+
 
     // return true if the map block is not 0, ie. if there is a blocking wall.
     return (this.map[Math.floor(y)][Math.floor(x)] != 0);

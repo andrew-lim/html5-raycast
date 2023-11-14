@@ -1,6 +1,6 @@
 # HTML5 Raycast
 
-[![Click to try demo](raycast3d.jpg)](https://andrew-lim.github.io/html5-raycast/raycast3d.htm)
+[![Click to try demo](raycast3d.png)](https://andrew-lim.github.io/html5-raycast/raycast3d.htm)
 
 A Wolfenstein 3D style JavaScript Raycaster using the browser's HTML5 Canvas for rendering.
 
@@ -18,7 +18,19 @@ Main Differences from original article:
 - **Horizontal walls** now use a **darker texture**.
 - **Texture mapped** floor and ceiling.
 
-Other links
+## Building
+
+There is no build step but you will need a HTTP webserver like [nginx](https://nginx.org/) to run and test locally.
+
+## Other links
 - [F. Permadi's Raycasting Tutorial](https://permadi.com/1996/05/ray-casting-tutorial-7/). The raycast math used in this demo is closely based on this tutorial.
 - [Game Engine Black Book: Wolfenstein 3D](https://fabiensanglard.net/gebbwolf3d/) Contains useful information about the original raycasting used in Wolfenstein 3D.
 - [Make Your Own Raycaster Game](https://www.youtube.com/watch?v=gYRrGTC7GtA). Cool YouTube video with excellent raycasting animations.
+
+## Asset Credits
+
+Sounds and images are from these OpenGameArt links:
+
+https://opengameart.org/content/big-pack-of-hand-painted-tiling-textures
+
+https://opengameart.org/content/first-person-dungeon-crawl-art-pack
