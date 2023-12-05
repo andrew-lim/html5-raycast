@@ -14,14 +14,14 @@ Main Differences from original article:
 - **Unit circle coordinates** are now used for the player's rotation. So turning left counterclockwise
   is a positive angle.
 - **Walls and tiles now use fixed game units**. The player's position in a tile is no longer a floating point
-  value between 0 to 1, but an integer between 0 to 128. In the original Wolfenstein 3D game a wall was apparently 8 feet and 1 foot was 16 game units.
+  value between 0 to 1, but an integer between 0 to 1280. A higher integer value seems to prevent tearing between adjacent walls.
 - **Horizontal walls** now use a **darker texture**.
 - **Texture mapped** floor and ceiling.
 
 ## Building
 
 There is no build step but you will need a HTTP webserver like [nginx](https://nginx.org/) to run and test locally.
-If you try to load the .htm file directly with a browser you'll like encounter an error like "The canvas has been tainted by cross-origin data."
+If you try to load the .htm file directly with the `file://` protocol you'll probably encounter an error like "The canvas has been tainted by cross-origin data."
 
 ## Other links
 - [F. Permadi's Raycasting Tutorial](https://permadi.com/1996/05/ray-casting-tutorial-7/). The raycast math used in this demo is closely based on this tutorial.
@@ -29,8 +29,6 @@ If you try to load the .htm file directly with a browser you'll like encounter a
 - [Make Your Own Raycaster Game](https://www.youtube.com/watch?v=gYRrGTC7GtA). Cool YouTube video with excellent raycasting animations.
 
 ## Asset Credits
-
-Sounds and images are from these OpenGameArt links:
 
 https://opengameart.org/content/big-pack-of-hand-painted-tiling-textures
 
